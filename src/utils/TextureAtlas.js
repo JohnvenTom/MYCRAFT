@@ -692,28 +692,45 @@ export class TextureAtlas {
   }
 
   /**
-   * 生成单贴图 UI 图标 canvas (放大版, 用于热键栏)
+   * 生成单贴图 UI 图标 canvas (放大版, 用于热键栏 / 背包 / 合成)
+   *
+   * 重要: 每次调用必须返回独立的 canvas 元素
+   *   - DOM 中一个节点只能有一个父节点, 若多个槽位复用同一 canvas,
+   *     后续 appendChild 会把 canvas 从前一个槽位移走, 导致 "每种方块只显示一个图标" 的 bug
+   *   - 修复: iconCache 仅缓存 "源 canvas" 避免重复 drawImage 整张图集,
+   *           每次返回源 canvas 的独立副本 (新 canvas + 复制内容)
+   *
    * @param {number} tileIndex 贴图索引
    * @param {number} size 输出像素边长
-   * @returns {HTMLCanvasElement}
+   * @returns {HTMLCanvasElement} 独立的 canvas 元素 (可被自由 appendChild)
    */
   getIcon(tileIndex, size = 48) {
-    if (this.iconCache.has(tileIndex)) {
-      return this.iconCache.get(tileIndex);
+    // 缓存源 canvas (按 tileIndex+size 复合键, 避免不同尺寸互相覆盖)
+    const cacheKey = tileIndex * 1000 + size;
+    let src = this.iconCache.get(cacheKey);
+    if (!src) {
+      const col = tileIndex % TILES_PER_ROW;
+      const row = Math.floor(tileIndex / TILES_PER_ROW);
+      src = document.createElement('canvas');
+      src.width = size;
+      src.height = size;
+      const ctx = src.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(
+        this.canvas,
+        col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+        0, 0, size, size
+      );
+      this.iconCache.set(cacheKey, src);
     }
-    const col = tileIndex % TILES_PER_ROW;
-    const row = Math.floor(tileIndex / TILES_PER_ROW);
-    const icon = document.createElement('canvas');
-    icon.width = size;
-    icon.height = size;
-    const ctx = icon.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(
-      this.canvas,
-      col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE,
-      0, 0, size, size
-    );
-    this.iconCache.set(tileIndex, icon);
-    return icon;
+    // 每次返回独立副本: 新建 canvas 并把源 canvas 内容复制过去
+    // 这样多个槽位可同时持有自己的图标 canvas, 不会互相抢占父节点
+    const clone = document.createElement('canvas');
+    clone.width = size;
+    clone.height = size;
+    const cloneCtx = clone.getContext('2d');
+    cloneCtx.imageSmoothingEnabled = false;
+    cloneCtx.drawImage(src, 0, 0);
+    return clone;
   }
 }
