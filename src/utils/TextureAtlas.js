@@ -495,194 +495,322 @@ function drawStick(ctx, ox, oy, seed) {
 }
 
 /**
- * 绘制木镐图标 (对角线 + 镐头)
+ * 绘制木镐图标 (像箭头指向右上角的造型)
+ * 整体造型: 柄从左下 (0,13) 对角线指向右上 (10,3), 镐头在右上角 (10-13,1-3),
+ *           整体像 ↗ 箭头指向右上角
+ * 柄: 主线 (i,13-i) for i=0..10, 2px 宽 (加右上一行), 颜色 #80502D 主色 + #B79447 高光
+ * 镐头: 矩形 4x3 (10-13, 1-3), 颜色 #7C5A3A 主 + #9C7C50 高光 (顶部 y=1)
+ * @param {CanvasRenderingContext2D} ctx 上下文
+ * @param {number} ox 贴图原点 X
+ * @param {number} oy 贴图原点 Y
+ * @param {number} seed 种子 (未使用)
  */
 function drawWoodPickaxe(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
-  // 柄
-  for (let i = 4; i < 14; i++) {
-    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
-    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  const handleMain = '#80502D';
+  const handleHi = '#B79447';
+  const headMain = '#7C5A3A';
+  const headHi = '#9C7C50';
+
+  // 柄主对角线: (i, 13-i) for i=0..10, 即 (0,13)→(10,3)
+  for (let i = 0; i <= 10; i++) {
+    px(ctx, ox + i, oy + (13 - i), handleMain);
   }
-  // 镐头 (顶部圆弧)
-  for (let x = 2; x <= 10; x++) {
-    px(ctx, ox + x, oy + 3, 'rgb(120,90,55)');
-    px(ctx, ox + x, oy + 4, 'rgb(120,90,55)');
+  // 柄右上沿 (高光): (i+1, 13-i) for i=0..9, 即 (1,13)→(10,4), 2px 宽效果
+  for (let i = 0; i <= 9; i++) {
+    px(ctx, ox + (i + 1), oy + (13 - i), handleHi);
   }
-  px(ctx, ox + 2, oy + 4, 'rgb(120,90,55)');
-  px(ctx, ox + 2, oy + 5, 'rgb(120,90,55)');
-  px(ctx, ox + 10, oy + 4, 'rgb(120,90,55)');
-  px(ctx, ox + 10, oy + 5, 'rgb(120,90,55)');
+
+  // 镐头 (右上角, 4x3 矩形 x=10-13 y=1-3)
+  for (let x = 10; x <= 13; x++) {
+    for (let y = 1; y <= 3; y++) {
+      px(ctx, ox + x, oy + y, headMain);
+    }
+  }
+  // 镐头高光 (顶部 y=1)
+  for (let x = 10; x <= 13; x++) {
+    px(ctx, ox + x, oy + 1, headHi);
+  }
 }
 
 /**
- * 绘制木斧图标
+ * 绘制木斧图标 (按原版 Minecraft 16x16 像素图 1:1 还原)
+ * 柄: 同木镐
+ * 斧头: 主体 (3,3)-(7,7) 5x5, 右下延伸到 (8,6)(8,7), 颜色 #7C5A3A + #9C7C50 高光
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} seed
  */
 function drawWoodAxe(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
   // 柄
-  for (let i = 4; i < 14; i++) {
-    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
-    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  const handleMain = '#80502D';
+  const handleHi = '#B79447';
+  const handlePts = [
+    [6, 15], [7, 15], [7, 14], [8, 14],
+    [8, 13], [9, 13], [9, 12], [10, 12],
+    [10, 11], [11, 11],
+  ];
+  for (const [x, y] of handlePts) px(ctx, ox + x, oy + y, handleMain);
+  for (const [x, y] of [[7, 13], [8, 12], [9, 11], [10, 10]]) {
+    px(ctx, ox + x, oy + y, handleHi);
   }
-  // 斧头 (L 形)
-  for (let x = 2; x <= 6; x++) {
-    for (let y = 2; y <= 6; y++) {
-      px(ctx, ox + x, oy + y, 'rgb(120,90,55)');
+  // 斧头主体 5x5 (3,3)-(7,7)
+  const headMain = '#7C5A3A';
+  const headHi = '#9C7C50';
+  for (let x = 3; x <= 7; x++) {
+    for (let y = 3; y <= 7; y++) {
+      px(ctx, ox + x, oy + y, headMain);
     }
   }
+  // 右下延伸 (斧刃弧度)
+  px(ctx, ox + 8, oy + 6, headMain);
+  px(ctx, ox + 8, oy + 7, headMain);
+  // 高光 (顶部 + 左侧边缘)
+  for (let x = 3; x <= 7; x++) px(ctx, ox + x, oy + 3, headHi);
+  for (let y = 3; y <= 7; y++) px(ctx, ox + 3, oy + y, headHi);
 }
 
 /**
- * 绘制木剑图标
+ * 绘制木剑图标 (按原版 Minecraft 16x16 像素图 1:1 还原)
+ * 剑刃: x=7-8 y=2-10, 剑尖 y=1 (x=7-8)
+ * 护手: x=5-10 y=11-12
+ * 柄: x=7-8 y=13-15
+ * 木质: 剑刃 #7C5A3A + 高光 #9C7C50; 护手/柄 #80502D
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} seed
  */
 function drawWoodSword(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
-  // 剑刃 (垂直)
-  for (let y = 2; y <= 11; y++) {
-    px(ctx, ox + 8, oy + y, 'rgb(150,115,70)');
-    px(ctx, ox + 7, oy + y, 'rgb(120,90,55)');
+  const bladeMain = '#7C5A3A';
+  const bladeHi = '#9C7C50';
+  const guardHandle = '#80502D';
+  // 剑刃主体 (x=7-8, y=2-10)
+  for (let y = 2; y <= 10; y++) {
+    px(ctx, ox + 7, oy + y, bladeMain);
+    px(ctx, ox + 8, oy + y, bladeMain);
   }
-  // 剑尖
-  px(ctx, ox + 7, oy + 1, 'rgb(150,115,70)');
-  px(ctx, ox + 8, oy + 1, 'rgb(150,115,70)');
-  // 护手
+  // 剑尖 (y=1)
+  px(ctx, ox + 7, oy + 1, bladeMain);
+  px(ctx, ox + 8, oy + 1, bladeMain);
+  // 剑刃高光 (左侧 x=7 上半段)
+  for (let y = 2; y <= 8; y++) {
+    px(ctx, ox + 7, oy + y, bladeHi);
+  }
+  // 护手 (x=5-10, y=11-12)
   for (let x = 5; x <= 10; x++) {
-    px(ctx, ox + x, oy + 11, 'rgb(80,55,30)');
-    px(ctx, ox + x, oy + 12, 'rgb(80,55,30)');
+    px(ctx, ox + x, oy + 11, guardHandle);
+    px(ctx, ox + x, oy + 12, guardHandle);
   }
-  // 柄
-  for (let y = 13; y <= 14; y++) {
-    px(ctx, ox + 7, oy + y, 'rgb(80,55,30)');
-    px(ctx, ox + 8, oy + y, 'rgb(80,55,30)');
+  // 柄 (x=7-8, y=13-15)
+  for (let y = 13; y <= 15; y++) {
+    px(ctx, ox + 7, oy + y, guardHandle);
+    px(ctx, ox + 8, oy + y, guardHandle);
   }
 }
 
 /**
- * 绘制木锹图标
+ * 绘制木锹图标 (按原版 Minecraft 16x16 像素图 1:1 还原)
+ * 柄: 同木镐
+ * 铲头: 5x5 (4,2)-(8,6), 顶部两角圆角 (4,2)(8,2) 空, 颜色 #7C5A3A + #9C7C50 高光
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} seed
  */
 function drawWoodShovel(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
   // 柄
-  for (let i = 4; i < 14; i++) {
-    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
-    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  const handleMain = '#80502D';
+  const handleHi = '#B79447';
+  const handlePts = [
+    [6, 15], [7, 15], [7, 14], [8, 14],
+    [8, 13], [9, 13], [9, 12], [10, 12],
+    [10, 11], [11, 11],
+  ];
+  for (const [x, y] of handlePts) px(ctx, ox + x, oy + y, handleMain);
+  for (const [x, y] of [[7, 13], [8, 12], [9, 11], [10, 10]]) {
+    px(ctx, ox + x, oy + y, handleHi);
   }
-  // 铲头 (梯形)
-  for (let y = 2; y <= 5; y++) {
-    const w = 4 - (y - 2);
-    for (let x = 4 - w; x <= 4 + w; x++) {
-      px(ctx, ox + x, oy + y, 'rgb(120,90,55)');
+  // 铲头 5x5 (4,2)-(8,6), 顶部两角圆角
+  const headMain = '#7C5A3A';
+  const headHi = '#9C7C50';
+  for (let x = 4; x <= 8; x++) {
+    for (let y = 2; y <= 6; y++) {
+      // 顶部两角 (4,2)(8,2) 留空
+      if ((x === 4 || x === 8) && y === 2) continue;
+      px(ctx, ox + x, oy + y, headMain);
     }
+  }
+  // 高光 (顶部边缘 y=3, x=5-7)
+  for (let x = 5; x <= 7; x++) {
+    px(ctx, ox + x, oy + 3, headHi);
   }
 }
 
 /**
- * 绘制石镐图标 (木柄 + 灰色石质镐头)
+ * 绘制石镐图标 (像箭头指向右上角的造型, 颜色用石质)
+ * 布局同木镐: 柄从左下 (0,13) 对角线指向右上 (10,3), 镐头在右上角 (10-13,1-3)
+ * 柄: #80502D 主 + #B79447 高光 (木质柄, 与木镐相同)
+ * 镐头: #767676 主 + #999999 高光 (顶部 y=1) + #565656 阴影 (底部 y=3 左端)
  * @param {CanvasRenderingContext2D} ctx 上下文
  * @param {number} ox 原点 X
  * @param {number} oy 原点 Y
- * @param {number} seed 种子 (未使用, 保持接口一致)
+ * @param {number} seed 种子
  */
 function drawStonePickaxe(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
-  // 木柄 (与木镐相同)
-  for (let i = 4; i < 14; i++) {
-    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
-    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  const handleMain = '#80502D';
+  const handleHi = '#B79447';
+  const headMain = '#767676';
+  const headHi = '#999999';
+  const headShadow = '#565656';
+
+  // 柄主对角线: (0,13)→(10,3)
+  for (let i = 0; i <= 10; i++) {
+    px(ctx, ox + i, oy + (13 - i), handleMain);
   }
-  // 石质镐头 (灰色, 比木镐头深一点)
-  const stone = 'rgb(110,110,110)';
-  const stoneDark = 'rgb(80,80,80)';
-  for (let x = 2; x <= 10; x++) {
-    px(ctx, ox + x, oy + 3, stone);
-    px(ctx, ox + x, oy + 4, stone);
+  // 柄右上沿 (高光)
+  for (let i = 0; i <= 9; i++) {
+    px(ctx, ox + (i + 1), oy + (13 - i), handleHi);
   }
-  px(ctx, ox + 2, oy + 4, stoneDark);
-  px(ctx, ox + 2, oy + 5, stoneDark);
-  px(ctx, ox + 10, oy + 4, stoneDark);
-  px(ctx, ox + 10, oy + 5, stoneDark);
+
+  // 石质镐头 (右上角 4x3)
+  for (let x = 10; x <= 13; x++) {
+    for (let y = 1; y <= 3; y++) {
+      px(ctx, ox + x, oy + y, headMain);
+    }
+  }
+  // 高光 (顶部 y=1)
+  for (let x = 10; x <= 13; x++) {
+    px(ctx, ox + x, oy + 1, headHi);
+  }
+  // 阴影 (底部 y=3 最左端, 即柄接入处对侧)
+  px(ctx, ox + 10, oy + 3, headShadow);
 }
 
 /**
- * 绘制石斧图标 (木柄 + 灰色石质斧头)
- * @param {CanvasRenderingContext2D} ctx 上下文
- * @param {number} ox 原点 X
- * @param {number} oy 原点 Y
- * @param {number} seed 种子
+ * 绘制石斧图标 (按原版 Minecraft 16x16 像素图 1:1 还原)
+ * 柄: 同木镐
+ * 斧头: 布局同木斧, 颜色用石质 #767676 + #999999 高光 + #565656 阴影
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} seed
  */
 function drawStoneAxe(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
-  // 木柄
-  for (let i = 4; i < 14; i++) {
-    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
-    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  // 柄
+  const handleMain = '#80502D';
+  const handleHi = '#B79447';
+  const handlePts = [
+    [6, 15], [7, 15], [7, 14], [8, 14],
+    [8, 13], [9, 13], [9, 12], [10, 12],
+    [10, 11], [11, 11],
+  ];
+  for (const [x, y] of handlePts) px(ctx, ox + x, oy + y, handleMain);
+  for (const [x, y] of [[7, 13], [8, 12], [9, 11], [10, 10]]) {
+    px(ctx, ox + x, oy + y, handleHi);
   }
-  // 石质斧头 (L 形, 灰色)
-  const stone = 'rgb(110,110,110)';
-  for (let x = 2; x <= 6; x++) {
-    for (let y = 2; y <= 6; y++) {
-      px(ctx, ox + x, oy + y, stone);
+  // 石质斧头主体 5x5 (3,3)-(7,7)
+  const headMain = '#767676';
+  const headHi = '#999999';
+  const headShadow = '#565656';
+  for (let x = 3; x <= 7; x++) {
+    for (let y = 3; y <= 7; y++) {
+      px(ctx, ox + x, oy + y, headMain);
     }
   }
-  // 边缘暗化
-  px(ctx, ox + 2, oy + 6, 'rgb(80,80,80)');
-  px(ctx, ox + 6, oy + 6, 'rgb(80,80,80)');
+  px(ctx, ox + 8, oy + 6, headMain);
+  px(ctx, ox + 8, oy + 7, headMain);
+  // 高光 (顶部 + 左侧)
+  for (let x = 3; x <= 7; x++) px(ctx, ox + x, oy + 3, headHi);
+  for (let y = 3; y <= 7; y++) px(ctx, ox + 3, oy + y, headHi);
+  // 阴影 (右下角)
+  px(ctx, ox + 7, oy + 7, headShadow);
+  px(ctx, ox + 8, oy + 7, headShadow);
 }
 
 /**
- * 绘制石剑图标 (灰色石质剑刃 + 木柄)
- * @param {CanvasRenderingContext2D} ctx 上下文
- * @param {number} ox 原点 X
- * @param {number} oy 原点 Y
- * @param {number} seed 种子
+ * 绘制石剑图标 (按原版 Minecraft 16x16 像素图 1:1 还原)
+ * 剑刃: 布局同木剑, 颜色用石质 #767676 + #999999 高光 + #565656 阴影
+ * 护手/柄: 同木剑 #80502D
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} seed
  */
 function drawStoneSword(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
-  // 石质剑刃 (灰色, 垂直)
-  const stone = 'rgb(130,130,130)';
-  const stoneDark = 'rgb(100,100,100)';
-  for (let y = 2; y <= 11; y++) {
-    px(ctx, ox + 8, oy + y, stone);
-    px(ctx, ox + 7, oy + y, stoneDark);
+  const bladeMain = '#767676';
+  const bladeHi = '#999999';
+  const bladeShadow = '#565656';
+  const guardHandle = '#80502D';
+  // 剑刃主体 (x=7-8, y=2-10)
+  for (let y = 2; y <= 10; y++) {
+    px(ctx, ox + 7, oy + y, bladeMain);
+    px(ctx, ox + 8, oy + y, bladeMain);
   }
-  // 剑尖
-  px(ctx, ox + 7, oy + 1, stone);
-  px(ctx, ox + 8, oy + 1, stone);
-  // 护手 (深棕, 与木剑相同)
+  // 剑尖 (y=1)
+  px(ctx, ox + 7, oy + 1, bladeMain);
+  px(ctx, ox + 8, oy + 1, bladeMain);
+  // 高光 (左侧 x=7 上半段)
+  for (let y = 2; y <= 8; y++) px(ctx, ox + 7, oy + y, bladeHi);
+  // 阴影 (右侧 x=8 下半段)
+  for (let y = 6; y <= 10; y++) px(ctx, ox + 8, oy + y, bladeShadow);
+  // 护手 (x=5-10, y=11-12)
   for (let x = 5; x <= 10; x++) {
-    px(ctx, ox + x, oy + 11, 'rgb(80,55,30)');
-    px(ctx, ox + x, oy + 12, 'rgb(80,55,30)');
+    px(ctx, ox + x, oy + 11, guardHandle);
+    px(ctx, ox + x, oy + 12, guardHandle);
   }
-  // 柄
-  for (let y = 13; y <= 14; y++) {
-    px(ctx, ox + 7, oy + y, 'rgb(80,55,30)');
-    px(ctx, ox + 8, oy + y, 'rgb(80,55,30)');
+  // 柄 (x=7-8, y=13-15)
+  for (let y = 13; y <= 15; y++) {
+    px(ctx, ox + 7, oy + y, guardHandle);
+    px(ctx, ox + 8, oy + y, guardHandle);
   }
 }
 
 /**
- * 绘制石锹图标 (木柄 + 灰色石质铲头)
- * @param {CanvasRenderingContext2D} ctx 上下文
- * @param {number} ox 原点 X
- * @param {number} oy 原点 Y
- * @param {number} seed 种子
+ * 绘制石锹图标 (按原版 Minecraft 16x16 像素图 1:1 还原)
+ * 柄: 同木镐
+ * 铲头: 布局同木锹, 颜色用石质 #767676 + #999999 高光 + #565656 阴影
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} ox
+ * @param {number} oy
+ * @param {number} seed
  */
 function drawStoneShovel(ctx, ox, oy, seed) {
   ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
-  // 木柄
-  for (let i = 4; i < 14; i++) {
-    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
-    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  // 柄
+  const handleMain = '#80502D';
+  const handleHi = '#B79447';
+  const handlePts = [
+    [6, 15], [7, 15], [7, 14], [8, 14],
+    [8, 13], [9, 13], [9, 12], [10, 12],
+    [10, 11], [11, 11],
+  ];
+  for (const [x, y] of handlePts) px(ctx, ox + x, oy + y, handleMain);
+  for (const [x, y] of [[7, 13], [8, 12], [9, 11], [10, 10]]) {
+    px(ctx, ox + x, oy + y, handleHi);
   }
-  // 石质铲头 (梯形, 灰色)
-  const stone = 'rgb(110,110,110)';
-  for (let y = 2; y <= 5; y++) {
-    const w = 4 - (y - 2);
-    for (let x = 4 - w; x <= 4 + w; x++) {
-      px(ctx, ox + x, oy + y, stone);
+  // 石质铲头 5x5 (4,2)-(8,6), 顶部两角圆角
+  const headMain = '#767676';
+  const headHi = '#999999';
+  const headShadow = '#565656';
+  for (let x = 4; x <= 8; x++) {
+    for (let y = 2; y <= 6; y++) {
+      if ((x === 4 || x === 8) && y === 2) continue;
+      px(ctx, ox + x, oy + y, headMain);
     }
   }
+  // 高光 (顶部边缘 y=3, x=5-7)
+  for (let x = 5; x <= 7; x++) px(ctx, ox + x, oy + 3, headHi);
+  // 阴影 (底部 y=6 两侧)
+  px(ctx, ox + 4, oy + 6, headShadow);
+  px(ctx, ox + 8, oy + 6, headShadow);
 }
 
 /**

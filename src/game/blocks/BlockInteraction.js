@@ -101,16 +101,21 @@ export class BlockInteraction {
   /**
    * 处理右键使用方块 (工作台等可交互方块)
    * 架构: 把工作台交互从 main.js 移到这里统一管理, 通过 onUseWorkbench 回调解耦 UI
+   *
+   * 注意: 不检查 placeCooldown, 因为放置工作台后会设置 0.2s 冷却,
+   *       若此处也检查 placeCooldown 会导致玩家放置工作台后 0.2s 内右键工作台无法打开 UI
+   *       (玩家瞄准刚放置的工作台期望立即打开 UI, 这是 Minecraft 原版行为)
+   *       防重复触发由 _openInventory 内部的 `if (this.inventoryUI.open) return` 保证
+   *
    * @param {Object} hit 命中结果
    * @returns {boolean} 是否消费了右键 (true 则不再触发放置)
    */
   _handleUseBlock(hit) {
     if (!this.input.mouseClicked[2]) return false;
-    if (this.placeCooldown > 0) return false;
     const id = this.world.getBlock(hit.x, hit.y, hit.z);
     if (id === BlockId.CRAFTING_TABLE) {
       if (this.onUseWorkbench) this.onUseWorkbench();
-      this.placeCooldown = 0.2; // 200ms 冷却, 防止重复触发
+      this.placeCooldown = 0.2; // 200ms 冷却, 防止同一帧重复触发 onUseWorkbench
       return true;
     }
     return false;
