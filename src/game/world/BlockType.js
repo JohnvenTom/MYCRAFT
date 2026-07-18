@@ -37,6 +37,10 @@ export const BlockId = Object.freeze({
   WOOD_AXE: 27,
   WOOD_SWORD: 28,
   WOOD_SHOVEL: 29,
+  STONE_PICKAXE: 30, // 石质工具 (比木质更强)
+  STONE_AXE: 31,
+  STONE_SWORD: 32,
+  STONE_SHOVEL: 33,
 });
 
 /**
@@ -231,6 +235,27 @@ export const BLOCKS = {
     id: BlockId.WOOD_SHOVEL, name: '木锹', hardness: 0,
     solid: false, transparent: true, liquid: false, renderDoubleSided: false,
     tiles: { top: TileIndex.WOOD_SHOVEL, bottom: TileIndex.WOOD_SHOVEL, side: TileIndex.WOOD_SHOVEL },
+  },
+  // 石质工具 (比木质更强: 速度 4.0 vs 2.5, 伤害 +1)
+  [BlockId.STONE_PICKAXE]: {
+    id: BlockId.STONE_PICKAXE, name: '石镐', hardness: 0,
+    solid: false, transparent: true, liquid: false, renderDoubleSided: false,
+    tiles: { top: TileIndex.STONE_PICKAXE, bottom: TileIndex.STONE_PICKAXE, side: TileIndex.STONE_PICKAXE },
+  },
+  [BlockId.STONE_AXE]: {
+    id: BlockId.STONE_AXE, name: '石斧', hardness: 0,
+    solid: false, transparent: true, liquid: false, renderDoubleSided: false,
+    tiles: { top: TileIndex.STONE_AXE, bottom: TileIndex.STONE_AXE, side: TileIndex.STONE_AXE },
+  },
+  [BlockId.STONE_SWORD]: {
+    id: BlockId.STONE_SWORD, name: '石剑', hardness: 0,
+    solid: false, transparent: true, liquid: false, renderDoubleSided: false,
+    tiles: { top: TileIndex.STONE_SWORD, bottom: TileIndex.STONE_SWORD, side: TileIndex.STONE_SWORD },
+  },
+  [BlockId.STONE_SHOVEL]: {
+    id: BlockId.STONE_SHOVEL, name: '石锹', hardness: 0,
+    solid: false, transparent: true, liquid: false, renderDoubleSided: false,
+    tiles: { top: TileIndex.STONE_SHOVEL, bottom: TileIndex.STONE_SHOVEL, side: TileIndex.STONE_SHOVEL },
   },
 };
 

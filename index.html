@@ -112,11 +112,13 @@
   <!-- 物品栏 + 合成 UI (按 E 打开) -->
   <div id="inventory-screen" class="screen hidden">
     <div class="inventory-content">
+      <!-- 标题: 物品栏 / 工作台 (InventoryUI.openInventory 时动态切换) -->
+      <div id="inventory-title">物品栏</div>
       <!-- 2x2 物品栏合成区 (无工作台时) / 3x3 工作台合成区 (打开工作台时) -->
       <div id="crafting-area">
         <div class="crafting-grid" id="crafting-grid"></div>
         <div class="crafting-arrow">→</div>
-        <div class="crafting-output" id="crafting-output"></div>
+        <div class="crafting-output inv-slot" id="crafting-output"></div>
       </div>
       <!-- 27 格背包 -->
       <div class="inventory-grid" id="inventory-grid"></div>

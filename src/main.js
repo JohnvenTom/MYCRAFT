@@ -451,6 +451,8 @@ class Game {
       inventory: this.inventory,
       mobSpawner: this.mobSpawner,
       net: this.net,
+      // 工作台交互回调: 右键工作台时打开 3x3 合成 UI
+      onUseWorkbench: () => this._openInventory(true),
     });
 
     // 物品栏 + 合成 UI
@@ -521,6 +523,8 @@ class Game {
 
   /**
    * 初始化新世界的起始物品栏 (前 9 格热键栏 + 一些背包物资, 便于测试合成系统)
+   * 调整: 工作台改为玩家用 4 个木板在 2x2 物品栏合成 (不再直接给)
+   *       新增圆石用于合成石质工具
    */
   _setupStartingInventory() {
     // 热键栏 (0-8)
@@ -533,14 +537,14 @@ class Game {
     this.inventory.setSlot(6, new ItemStack(BlockId.WOOD_PICKAXE, 1));
     this.inventory.setSlot(7, new ItemStack(BlockId.WOOD_AXE, 1));
     this.inventory.setSlot(8, new ItemStack(BlockId.WOOD_SWORD, 1));
-    // 背包 (9-35)
-    this.inventory.setSlot(9, new ItemStack(BlockId.CRAFTING_TABLE, 4));
-    this.inventory.setSlot(10, new ItemStack(BlockId.FURNACE, 4));
-    this.inventory.setSlot(11, new ItemStack(BlockId.STICK, 16));
-    this.inventory.setSlot(12, new ItemStack(BlockId.COAL_ORE, 16));
-    this.inventory.setSlot(13, new ItemStack(BlockId.IRON_ORE, 8));
-    this.inventory.setSlot(14, new ItemStack(BlockId.SAND, 16));
-    this.inventory.setSlot(15, new ItemStack(BlockId.WOOD_SHOVEL, 1));
+    // 背包 (9-35) - 工作台需玩家用 4 个木板在 2x2 物品栏合成 (配方 crafting_table)
+    this.inventory.setSlot(9, new ItemStack(BlockId.FURNACE, 4));
+    this.inventory.setSlot(10, new ItemStack(BlockId.STICK_BLOCK, 16));
+    this.inventory.setSlot(11, new ItemStack(BlockId.COAL_ORE, 16));
+    this.inventory.setSlot(12, new ItemStack(BlockId.IRON_ORE, 8));
+    this.inventory.setSlot(13, new ItemStack(BlockId.SAND, 16));
+    this.inventory.setSlot(14, new ItemStack(BlockId.WOOD_SHOVEL, 1));
+    this.inventory.setSlot(15, new ItemStack(BlockId.COBBLESTONE, 32)); // 用于合成石质工具
   }
 
   /**
@@ -891,12 +895,7 @@ class Game {
       return;
     }
 
-    // 右键瞄准工作台 → 打开 3x3 合成 UI (在 interaction.update 之前消费右键)
-    if (this.engine.input.mouseClicked[2] && this._isAimingWorkbench()) {
-      this.engine.input.mouseClicked[2] = false; // 消费掉, 避免触发放置
-      this._openInventory(true);
-      return;
-    }
+    // 工作台交互已移到 BlockInteraction._handleUseBlock, 通过 onUseWorkbench 回调打开 3x3 UI
 
     // 玩家控制 + 物理 (固定步长子步, 避免高速穿墙)
     this.controller.update(dt);
@@ -1087,17 +1086,6 @@ class Game {
       hungerHtml += `<span class="status-icon" style="opacity:${opacity}">${pixelSvg(DRUMSTICK_PIXELS, color)}</span>`;
     }
     this.dom.hungerRow.innerHTML = hungerHtml;
-  }
-
-  /**
-   * 判断玩家当前是否瞄准工作台方块
-   * @returns {boolean}
-   */
-  _isAimingWorkbench() {
-    if (!this.interaction || !this.interaction.currentHit) return false;
-    const hit = this.interaction.currentHit;
-    const id = this.world.getBlock(hit.x, hit.y, hit.z);
-    return id === BlockId.CRAFTING_TABLE;
   }
 
   /**

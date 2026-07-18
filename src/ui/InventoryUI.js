@@ -284,6 +284,10 @@ export class InventoryUI {
     }
     this.open = true;
     this.root.classList.remove('hidden');
+    // UI 美化: 工作台模式加 mode-table class (CSS 用于木色边框高亮), 切换标题文本
+    this.root.classList.toggle('mode-table', useTable);
+    const titleEl = this.root.querySelector('#inventory-title');
+    if (titleEl) titleEl.textContent = useTable ? '工作台' : '物品栏';
     this._render();
   }
 

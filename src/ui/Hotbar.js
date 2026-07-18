@@ -24,7 +24,8 @@ export class Hotbar {
     this.nameEl = nameEl;
     this.inventory = inventory;
 
-    /** 创造模式默认布局 (无 inventory 时使用) */
+    /** 创造模式默认布局 (无 inventory 时使用)
+     *  修复: 用 CRAFTING_TABLE + FURNACE 替换 SAND + BRICK, 建造场景下工作台/熔炉更常用 */
     this.creativeSlots = [
       BlockId.GRASS,
       BlockId.DIRT,
@@ -32,9 +33,9 @@ export class Hotbar {
       BlockId.COBBLESTONE,
       BlockId.LOG,
       BlockId.PLANKS,
-      BlockId.SAND,
+      BlockId.CRAFTING_TABLE,
+      BlockId.FURNACE,
       BlockId.GLASS,
-      BlockId.BRICK,
     ];
     this.selectedIndex = 0;
     /** 名称提示自动消失计时 */

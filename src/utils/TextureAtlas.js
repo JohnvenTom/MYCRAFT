@@ -49,6 +49,10 @@ export const TileIndex = Object.freeze({
   WOOD_AXE: 30,
   WOOD_SWORD: 31,
   WOOD_SHOVEL: 32,
+  STONE_PICKAXE: 33,
+  STONE_AXE: 34,
+  STONE_SWORD: 35,
+  STONE_SHOVEL: 36,
 });
 
 /**
@@ -574,6 +578,114 @@ function drawWoodShovel(ctx, ox, oy, seed) {
 }
 
 /**
+ * 绘制石镐图标 (木柄 + 灰色石质镐头)
+ * @param {CanvasRenderingContext2D} ctx 上下文
+ * @param {number} ox 原点 X
+ * @param {number} oy 原点 Y
+ * @param {number} seed 种子 (未使用, 保持接口一致)
+ */
+function drawStonePickaxe(ctx, ox, oy, seed) {
+  ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
+  // 木柄 (与木镐相同)
+  for (let i = 4; i < 14; i++) {
+    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
+    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  }
+  // 石质镐头 (灰色, 比木镐头深一点)
+  const stone = 'rgb(110,110,110)';
+  const stoneDark = 'rgb(80,80,80)';
+  for (let x = 2; x <= 10; x++) {
+    px(ctx, ox + x, oy + 3, stone);
+    px(ctx, ox + x, oy + 4, stone);
+  }
+  px(ctx, ox + 2, oy + 4, stoneDark);
+  px(ctx, ox + 2, oy + 5, stoneDark);
+  px(ctx, ox + 10, oy + 4, stoneDark);
+  px(ctx, ox + 10, oy + 5, stoneDark);
+}
+
+/**
+ * 绘制石斧图标 (木柄 + 灰色石质斧头)
+ * @param {CanvasRenderingContext2D} ctx 上下文
+ * @param {number} ox 原点 X
+ * @param {number} oy 原点 Y
+ * @param {number} seed 种子
+ */
+function drawStoneAxe(ctx, ox, oy, seed) {
+  ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
+  // 木柄
+  for (let i = 4; i < 14; i++) {
+    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
+    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  }
+  // 石质斧头 (L 形, 灰色)
+  const stone = 'rgb(110,110,110)';
+  for (let x = 2; x <= 6; x++) {
+    for (let y = 2; y <= 6; y++) {
+      px(ctx, ox + x, oy + y, stone);
+    }
+  }
+  // 边缘暗化
+  px(ctx, ox + 2, oy + 6, 'rgb(80,80,80)');
+  px(ctx, ox + 6, oy + 6, 'rgb(80,80,80)');
+}
+
+/**
+ * 绘制石剑图标 (灰色石质剑刃 + 木柄)
+ * @param {CanvasRenderingContext2D} ctx 上下文
+ * @param {number} ox 原点 X
+ * @param {number} oy 原点 Y
+ * @param {number} seed 种子
+ */
+function drawStoneSword(ctx, ox, oy, seed) {
+  ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
+  // 石质剑刃 (灰色, 垂直)
+  const stone = 'rgb(130,130,130)';
+  const stoneDark = 'rgb(100,100,100)';
+  for (let y = 2; y <= 11; y++) {
+    px(ctx, ox + 8, oy + y, stone);
+    px(ctx, ox + 7, oy + y, stoneDark);
+  }
+  // 剑尖
+  px(ctx, ox + 7, oy + 1, stone);
+  px(ctx, ox + 8, oy + 1, stone);
+  // 护手 (深棕, 与木剑相同)
+  for (let x = 5; x <= 10; x++) {
+    px(ctx, ox + x, oy + 11, 'rgb(80,55,30)');
+    px(ctx, ox + x, oy + 12, 'rgb(80,55,30)');
+  }
+  // 柄
+  for (let y = 13; y <= 14; y++) {
+    px(ctx, ox + 7, oy + y, 'rgb(80,55,30)');
+    px(ctx, ox + 8, oy + y, 'rgb(80,55,30)');
+  }
+}
+
+/**
+ * 绘制石锹图标 (木柄 + 灰色石质铲头)
+ * @param {CanvasRenderingContext2D} ctx 上下文
+ * @param {number} ox 原点 X
+ * @param {number} oy 原点 Y
+ * @param {number} seed 种子
+ */
+function drawStoneShovel(ctx, ox, oy, seed) {
+  ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
+  // 木柄
+  for (let i = 4; i < 14; i++) {
+    px(ctx, ox + i, oy + 14 - i + 4, 'rgb(150,115,70)');
+    px(ctx, ox + i + 1, oy + 14 - i + 4, 'rgb(150,115,70)');
+  }
+  // 石质铲头 (梯形, 灰色)
+  const stone = 'rgb(110,110,110)';
+  for (let y = 2; y <= 5; y++) {
+    const w = 4 - (y - 2);
+    for (let x = 4 - w; x <= 4 + w; x++) {
+      px(ctx, ox + x, oy + y, stone);
+    }
+  }
+}
+
+/**
  * 纹理图集类
  * 负责生成图集画布、构造 THREE.CanvasTexture、提供 UV 查询与 UI 图标
  */
@@ -637,6 +749,10 @@ export class TextureAtlas {
       drawWoodAxe,             // 30
       drawWoodSword,           // 31
       drawWoodShovel,          // 32
+      drawStonePickaxe,        // 33
+      drawStoneAxe,            // 34
+      drawStoneSword,          // 35
+      drawStoneShovel,         // 36
     ];
 
     drawers.forEach((drawer, i) => {

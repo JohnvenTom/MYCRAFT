@@ -99,6 +99,39 @@ export const RECIPES = [
     output: { id: BlockId.WOOD_SHOVEL, count: 1 },
     requiresTable: true,
   },
+  // ===== 石质工具系列 (需要工作台, 用圆石代替木板, 性能优于木质) =====
+  {
+    id: 'stone_pickaxe',
+    type: 'shaped',
+    pattern: ['CCC', ' S ', ' S '],
+    ingredients: { C: BlockId.COBBLESTONE, S: BlockId.STICK_BLOCK },
+    output: { id: BlockId.STONE_PICKAXE, count: 1 },
+    requiresTable: true,
+  },
+  {
+    id: 'stone_axe',
+    type: 'shaped',
+    pattern: ['CC ', 'CS ', ' S '],
+    ingredients: { C: BlockId.COBBLESTONE, S: BlockId.STICK_BLOCK },
+    output: { id: BlockId.STONE_AXE, count: 1 },
+    requiresTable: true,
+  },
+  {
+    id: 'stone_sword',
+    type: 'shaped',
+    pattern: ['C', 'C', 'S'],
+    ingredients: { C: BlockId.COBBLESTONE, S: BlockId.STICK_BLOCK },
+    output: { id: BlockId.STONE_SWORD, count: 1 },
+    requiresTable: true,
+  },
+  {
+    id: 'stone_shovel',
+    type: 'shaped',
+    pattern: ['C', 'S', 'S'],
+    ingredients: { C: BlockId.COBBLESTONE, S: BlockId.STICK_BLOCK },
+    output: { id: BlockId.STONE_SHOVEL, count: 1 },
+    requiresTable: true,
+  },
   {
     id: 'iron_block',
     type: 'shaped',
@@ -130,13 +163,36 @@ export const RECIPES = [
     output: { id: BlockId.GLASS, count: 2 },
     requiresTable: false,
   },
+  // 修复: 移除 brick_block 配方 (输入输出都是 BRICK, 自循环无意义; BRICK 本身已是方块)
+
+  // ===== 反向分解配方 (1 块 → 9 矿石, 增加合成灵活性) =====
   {
-    id: 'brick_block',
-    type: 'shaped',
-    pattern: ['BB', 'BB'],
-    ingredients: { B: BlockId.BRICK },
-    output: { id: BlockId.BRICK, count: 1 },
-    requiresTable: false,
+    id: 'unpack_coal',
+    type: 'shapeless',
+    pattern: [BlockId.COAL_BLOCK],
+    output: { id: BlockId.COAL_ORE, count: 9 },
+    requiresTable: true,
+  },
+  {
+    id: 'unpack_iron',
+    type: 'shapeless',
+    pattern: [BlockId.IRON_BLOCK],
+    output: { id: BlockId.IRON_ORE, count: 9 },
+    requiresTable: true,
+  },
+  {
+    id: 'unpack_gold',
+    type: 'shapeless',
+    pattern: [BlockId.GOLD_BLOCK],
+    output: { id: BlockId.GOLD_ORE, count: 9 },
+    requiresTable: true,
+  },
+  {
+    id: 'unpack_diamond',
+    type: 'shapeless',
+    pattern: [BlockId.DIAMOND_BLOCK],
+    output: { id: BlockId.DIAMOND_ORE, count: 9 },
+    requiresTable: true,
   },
 ];
 
@@ -226,10 +282,12 @@ function shrinkInputGrid(grid) {
  * @returns {Object|null} 匹配的配方 output ({id, count}) 或 null
  */
 export function matchRecipe(inputGrid, hasTable) {
-  // 2x2 模式只考虑左上 4 格
-  const grid = hasTable ? inputGrid.slice() : normalizeGrid(
-    [inputGrid[0], inputGrid[1], inputGrid[3], inputGrid[4]], 2
-  );
+  // 修复 2x2 索引错位 BUG:
+  //   原代码 [inputGrid[0], inputGrid[1], inputGrid[3], inputGrid[4]] 假设输入长度 9,
+  //   但 InventoryUI 在 2x2 模式下传入长度 4 的数组 (inputGrid[4] 为 undefined),
+  //   导致竖向 2 格配方 (stick/wood_sword/wood_shovel) 匹配异常。
+  //   修复: 2x2 模式直接 normalizeGrid 长度 4 的输入到 3x3 网格的 [0,1,3,4] 位置。
+  const grid = hasTable ? inputGrid.slice() : normalizeGrid(inputGrid, 2);
   const shrunkInput = shrinkInputGrid(grid);
   // 检查所有配方
   for (const recipe of RECIPES) {

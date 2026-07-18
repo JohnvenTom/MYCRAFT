@@ -303,6 +303,21 @@ canvas#game-canvas {
   align-items: center;
   image-rendering: pixelated;
 }
+/* UI 美化: 标题样式 (物品栏 / 工作台) */
+#inventory-title {
+  font-size: 14px;
+  color: #ffffff;
+  text-shadow: 2px 2px 0 #000;
+  margin-bottom: 4px;
+  text-align: center;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+/* UI 美化: 工作台模式木色边框高亮 (mode-table class 加在 #inventory-screen 上) */
+#inventory-screen.mode-table .inventory-content {
+  border-color: #8b6f47; /* 木色边框, 区分工作台 */
+  box-shadow: 0 0 16px rgba(139, 111, 71, 0.4);
+}
 #crafting-area {
   display: flex;
   align-items: center;
@@ -346,8 +361,11 @@ canvas#game-canvas {
   box-shadow: 0 0 8px rgba(93, 187, 60, 0.6);
   cursor: pointer;
 }
+/* UI 美化: 合成产物 hover 强化 (放大 + 背景变化) */
 .crafting-output.has-item:hover {
-  background: rgba(120, 120, 120, 0.8);
+  background: rgba(120, 120, 120, 0.9);
+  transform: scale(1.05);
+  transition: transform 0.1s;
 }
 .inventory-grid {
   display: grid;
@@ -380,7 +398,8 @@ canvas#game-canvas {
   cursor: pointer;
 }
 .inv-slot:hover {
-  background: rgba(120, 120, 120, 0.8);
+  background: rgba(140, 140, 140, 0.9);
+  border-color: #ffffff;
 }
 .inv-slot.selected {
   border-color: #ffffff;

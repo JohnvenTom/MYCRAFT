@@ -10,6 +10,7 @@ export const MAX_STACK = 64;
 
 /**
  * 判断物品 id 是否为工具 (不可堆叠)
+ * 包含木质和石质工具系列
  * @param {number} id 物品 id
  * @returns {boolean}
  */
@@ -17,7 +18,11 @@ export function isTool(id) {
   return id === BlockId.WOOD_PICKAXE
     || id === BlockId.WOOD_AXE
     || id === BlockId.WOOD_SWORD
-    || id === BlockId.WOOD_SHOVEL;
+    || id === BlockId.WOOD_SHOVEL
+    || id === BlockId.STONE_PICKAXE
+    || id === BlockId.STONE_AXE
+    || id === BlockId.STONE_SWORD
+    || id === BlockId.STONE_SHOVEL;
 }
 
 /**

@@ -25,8 +25,9 @@ export class BlockInteraction {
    * @param {import('../items/Inventory.js').Inventory} [opts.inventory] 物品栏 (生存模式)
    * @param {import('../entity/MobSpawner.js').MobSpawner} [opts.mobSpawner] 生物生成器 (用于攻击生物)
    * @param {import('../net/MultiplayerClient.js').MultiplayerClient} [opts.net] 多人联机客户端
+   * @param {() => void} [opts.onUseWorkbench] 右键使用工作台回调 (main.js 注入, 打开 3x3 合成 UI)
    */
-  constructor({ world, player, input, highlight, hotbar, audio, inventory, mobSpawner, net }) {
+  constructor({ world, player, input, highlight, hotbar, audio, inventory, mobSpawner, net, onUseWorkbench }) {
     this.world = world;
     this.player = player;
     this.input = input;
@@ -36,6 +37,8 @@ export class BlockInteraction {
     this.inventory = inventory;
     this.mobSpawner = mobSpawner;
     this.net = net;
+    /** 右键使用工作台回调 (由 main.js 注入 _openInventory(true)) */
+    this.onUseWorkbench = onUseWorkbench;
 
     /** 当前瞄准的方块命中结果 */
     this.currentHit = null;
@@ -81,12 +84,36 @@ export class BlockInteraction {
     if (hit) {
       this.highlight.show(hit.x, hit.y, hit.z);
       this._handleBreak(hit, dt);
-      this._handlePlace(hit);
+      // 修复架构: 工作台交互统一在 BlockInteraction 处理, 不再写在 main.js
+      // 若右键使用了可交互方块 (如工作台), 消费右键并跳过放置
+      if (this._handleUseBlock(hit)) {
+        this.input.mouseClicked[2] = false;
+      } else {
+        this._handlePlace(hit);
+      }
     } else {
       this.highlight.hide();
       this.breakProgress = 0;
       this.breakingX = Infinity;
     }
+  }
+
+  /**
+   * 处理右键使用方块 (工作台等可交互方块)
+   * 架构: 把工作台交互从 main.js 移到这里统一管理, 通过 onUseWorkbench 回调解耦 UI
+   * @param {Object} hit 命中结果
+   * @returns {boolean} 是否消费了右键 (true 则不再触发放置)
+   */
+  _handleUseBlock(hit) {
+    if (!this.input.mouseClicked[2]) return false;
+    if (this.placeCooldown > 0) return false;
+    const id = this.world.getBlock(hit.x, hit.y, hit.z);
+    if (id === BlockId.CRAFTING_TABLE) {
+      if (this.onUseWorkbench) this.onUseWorkbench();
+      this.placeCooldown = 0.2; // 200ms 冷却, 防止重复触发
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -126,13 +153,17 @@ export class BlockInteraction {
       }
     }
     if (bestMob) {
-      // 计算伤害 (手持剑=4, 斧=3, 镐=2, 锹=1, 空=1)
+      // 计算伤害 (木质: 剑=4, 斧=3, 镐=2, 锹=1; 石质: 剑=5, 斧=4, 镐=3, 锹=2)
       const heldId = this.hotbar.getSelectedBlock();
       let damage = 1;
       if (heldId === BlockId.WOOD_SWORD) damage = 4;
+      else if (heldId === BlockId.STONE_SWORD) damage = 5;
       else if (heldId === BlockId.WOOD_AXE) damage = 3;
+      else if (heldId === BlockId.STONE_AXE) damage = 4;
       else if (heldId === BlockId.WOOD_PICKAXE) damage = 2;
+      else if (heldId === BlockId.STONE_PICKAXE) damage = 3;
       else if (heldId === BlockId.WOOD_SHOVEL) damage = 1;
+      else if (heldId === BlockId.STONE_SHOVEL) damage = 2;
       // 创造模式一击必杀
       if (this.player.gameMode === GameMode.CREATIVE) damage = 100;
       const damaged = bestMob.damage(damage);
@@ -198,16 +229,27 @@ export class BlockInteraction {
     }
 
     // 生存: 按硬度累积 (持有工具加速)
+    // 工具梯度: 木 2.5x, 石 4.0x (石质工具比木质更快, 符合原版)
     let speed = 1;
     const heldId = this.hotbar.getSelectedBlock();
-    if (heldId === BlockId.WOOD_PICKAXE && [BlockId.STONE, BlockId.COBBLESTONE, BlockId.COAL_ORE, BlockId.IRON_ORE, BlockId.GOLD_ORE, BlockId.DIAMOND_ORE].includes(id)) {
+    // 镐子: 石头/矿石类
+    const pickaxeBlocks = [BlockId.STONE, BlockId.COBBLESTONE, BlockId.COAL_ORE, BlockId.IRON_ORE, BlockId.GOLD_ORE, BlockId.DIAMOND_ORE];
+    if (heldId === BlockId.WOOD_PICKAXE && pickaxeBlocks.includes(id)) {
       speed = 2.5;
+    } else if (heldId === BlockId.STONE_PICKAXE && pickaxeBlocks.includes(id)) {
+      speed = 4.0;
     } else if (heldId === BlockId.WOOD_AXE && [BlockId.LOG, BlockId.PLANKS, BlockId.CRAFTING_TABLE].includes(id)) {
       speed = 2.5;
+    } else if (heldId === BlockId.STONE_AXE && [BlockId.LOG, BlockId.PLANKS, BlockId.CRAFTING_TABLE].includes(id)) {
+      speed = 4.0;
     } else if (heldId === BlockId.WOOD_SHOVEL && [BlockId.DIRT, BlockId.GRASS, BlockId.SAND, BlockId.GRAVEL, BlockId.SNOW].includes(id)) {
       speed = 2.5;
+    } else if (heldId === BlockId.STONE_SHOVEL && [BlockId.DIRT, BlockId.GRASS, BlockId.SAND, BlockId.GRAVEL, BlockId.SNOW].includes(id)) {
+      speed = 4.0;
     } else if (heldId === BlockId.WOOD_SWORD && [BlockId.LEAVES].includes(id)) {
       speed = 2.5;
+    } else if (heldId === BlockId.STONE_SWORD && [BlockId.LEAVES].includes(id)) {
+      speed = 4.0;
     }
     const breakTime = (def.hardness * BREAK_TIME_PER_HARDNESS) / speed;
     this.breakProgress += dt / breakTime;
