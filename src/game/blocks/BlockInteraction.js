@@ -26,8 +26,11 @@ export class BlockInteraction {
    * @param {import('../entity/MobSpawner.js').MobSpawner} [opts.mobSpawner] 生物生成器 (用于攻击生物)
    * @param {import('../net/MultiplayerClient.js').MultiplayerClient} [opts.net] 多人联机客户端
    * @param {() => void} [opts.onUseWorkbench] 右键使用工作台回调 (main.js 注入, 打开 3x3 合成 UI)
+   * @param {import('./BreakOverlay.js').BreakOverlay} [opts.breakOverlay] 破坏裂缝覆盖层 (显示挖掘进度)
+   * @param {import('../entity/Particle.js').ParticleSystem} [opts.particles] 粒子系统 (方块破坏飞溅粒子)
+   * @param {import('../../utils/TextureAtlas.js').TextureAtlas} [opts.atlas] 纹理图集 (用于获取方块代表色)
    */
-  constructor({ world, player, input, highlight, hotbar, audio, inventory, mobSpawner, net, onUseWorkbench }) {
+  constructor({ world, player, input, highlight, hotbar, audio, inventory, mobSpawner, net, onUseWorkbench, breakOverlay, particles, atlas }) {
     this.world = world;
     this.player = player;
     this.input = input;
@@ -39,6 +42,12 @@ export class BlockInteraction {
     this.net = net;
     /** 右键使用工作台回调 (由 main.js 注入 _openInventory(true)) */
     this.onUseWorkbench = onUseWorkbench;
+    /** 破坏裂缝覆盖层 (可选, 未注入则不显示裂缝) */
+    this.breakOverlay = breakOverlay;
+    /** 粒子系统 (可选, 未注入则不产生破坏粒子) */
+    this.particles = particles;
+    /** 纹理图集 (可选, 用于查询方块代表色) */
+    this.atlas = atlas;
 
     /** 当前瞄准的方块命中结果 */
     this.currentHit = null;
@@ -95,6 +104,8 @@ export class BlockInteraction {
       this.highlight.hide();
       this.breakProgress = 0;
       this.breakingX = Infinity;
+      // 没瞄准方块: 隐藏破坏裂缝覆盖层
+      if (this.breakOverlay) this.breakOverlay.hide();
     }
   }
 
@@ -218,12 +229,15 @@ export class BlockInteraction {
     const def = getBlock(id);
     if (!isBreakable(id)) {
       this.breakProgress = 0;
+      // 不可破坏 (基岩): 隐藏裂缝
+      if (this.breakOverlay) this.breakOverlay.hide();
       return;
     }
 
     if (!this.input.mouseDown[0]) {
-      // 没按住 → 进度衰减 (可选, 这里直接清零)
+      // 没按住 → 进度清零, 隐藏裂缝
       this.breakProgress = 0;
+      if (this.breakOverlay) this.breakOverlay.hide();
       return;
     }
 
@@ -258,13 +272,19 @@ export class BlockInteraction {
     }
     const breakTime = (def.hardness * BREAK_TIME_PER_HARDNESS) / speed;
     this.breakProgress += dt / breakTime;
+
+    // 同步破坏裂缝覆盖层 (根据进度显示对应 stage 的裂缝贴图)
+    if (this.breakOverlay) {
+      this.breakOverlay.show(hit.x, hit.y, hit.z, this.breakProgress);
+    }
+
     if (this.breakProgress >= 1) {
       this._doBreak(hit, id);
     }
   }
 
   /**
-   * 执行破坏: 置空气 + 音效 + 重置进度 + 掉落物入物品栏
+   * 执行破坏: 置空气 + 音效 + 重置进度 + 掉落物入物品栏 + 粒子飞溅
    * @param {Object} hit
    * @param {number} id 原方块 id
    */
@@ -286,6 +306,16 @@ export class BlockInteraction {
       this.inventory.add(stack);
       this.hotbar.markDirty();
     }
+    // 生成像素方块破坏粒子 (颜色与方块贴图一致)
+    if (this.particles && this.atlas) {
+      // 方块中心位置 (世界坐标)
+      const center = new THREE.Vector3(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+      // 从 atlas 获取方块 side 贴图的代表色
+      const color = this.atlas.getTileColor(def.tiles.side);
+      this.particles.spawnBlockBreak(center, color, 20);
+    }
+    // 隐藏破坏裂缝覆盖层
+    if (this.breakOverlay) this.breakOverlay.hide();
     this.breakProgress = 0;
     this.breakingX = Infinity;
   }

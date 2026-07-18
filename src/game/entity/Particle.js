@@ -106,6 +106,50 @@ export class ParticleSystem {
   }
 
   /**
+   * 生成方块破坏粒子 (像素方块飞溅 + 受重力下落 + 淡出消失)
+   * 用于挖掘方块时产生与方块颜色一致的像素碎屑
+   *
+   * 物理参数:
+   *   - 初速度: 向上 (1.5-3.5) + 水平随机方向 (1.0-3.5)
+   *   - 重力: -12 (比血溅略轻, 让粒子有更明显的下落感)
+   *   - 生命: 0.8-1.4 秒
+   *   - 大小: 3-5 像素 (像素风)
+   *   - 淡出曲线: 前 50% 不透明, 后 50% 线性淡出 (与死亡烟雾/血溅不同的曲线)
+   *
+   * @param {THREE.Vector3} pos 方块中心位置 (世界坐标)
+   * @param {THREE.Color} color 方块代表色 (从 TextureAtlas.getTileColor 获取)
+   * @param {number} [count=18] 粒子数量
+   */
+  spawnBlockBreak(pos, color, count = 18) {
+    const col = color.clone();
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= this.maxParticles) break;
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.0 + Math.random() * 2.5;
+      // 颜色微微扰动 (像素方块自然颗粒感)
+      const c = col.clone();
+      c.r = Math.max(0, Math.min(1, c.r + (Math.random() - 0.5) * 0.15));
+      c.g = Math.max(0, Math.min(1, c.g + (Math.random() - 0.5) * 0.15));
+      c.b = Math.max(0, Math.min(1, c.b + (Math.random() - 0.5) * 0.15));
+      this.particles.push({
+        pos: pos.clone(),
+        vel: new THREE.Vector3(
+          Math.cos(angle) * speed,
+          1.5 + Math.random() * 2.0, // 向上初速度
+          Math.sin(angle) * speed
+        ),
+        life: 0,
+        maxLife: 0.8 + Math.random() * 0.6, // 0.8-1.4 秒
+        size: 3 + Math.random() * 2, // 3-5 像素
+        color: c,
+        gravity: -12, // 受重力下落
+        // 标记为方块粒子 (用专用淡出曲线, 见 _syncGeometry)
+        isBlock: true,
+      });
+    }
+  }
+
+  /**
    * 每帧更新粒子位置/生命, 重建 Points geometry
    * @param {number} dt 帧间隔 (秒)
    */
@@ -166,9 +210,14 @@ export class ParticleSystem {
       positions[i * 3 + 1] = p.pos.y;
       positions[i * 3 + 2] = p.pos.z;
       sizes[i] = p.size;
-      // 淡出曲线: 前 30% 不透明, 后 70% 线性淡出
       const t = p.life / p.maxLife;
-      alphas[i] = t < 0.3 ? 1.0 : 1.0 - (t - 0.3) / 0.7;
+      if (p.isBlock) {
+        // 方块粒子: 前 50% 不透明, 后 50% 线性淡出 (慢慢消失)
+        alphas[i] = t < 0.5 ? 1.0 : 1.0 - (t - 0.5) / 0.5;
+      } else {
+        // 默认粒子 (烟雾/血溅): 前 30% 不透明, 后 70% 线性淡出
+        alphas[i] = t < 0.3 ? 1.0 : 1.0 - (t - 0.3) / 0.7;
+      }
       colors[i * 3] = p.color.r;
       colors[i * 3 + 1] = p.color.g;
       colors[i * 3 + 2] = p.color.b;

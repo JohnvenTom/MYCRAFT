@@ -11,8 +11,8 @@ import * as THREE from 'three';
 export const TILE_SIZE = 16;
 /** 图集每行贴图数 */
 export const TILES_PER_ROW = 16;
-/** 图集总行数 (预留) */
-export const ATLAS_ROWS = 6;
+/** 图集总行数 (预留, 第 7 行用于破坏阶段贴图) */
+export const ATLAS_ROWS = 7;
 
 /** 贴图索引枚举 (与下方 ATLAS_TILES 顺序一致) */
 export const TileIndex = Object.freeze({
@@ -53,6 +53,17 @@ export const TileIndex = Object.freeze({
   STONE_AXE: 34,
   STONE_SWORD: 35,
   STONE_SHOVEL: 36,
+  // 破坏阶段贴图 (0-9, 共 10 张, 用于挖掘裂缝显示)
+  DESTROY_STAGE_0: 37,
+  DESTROY_STAGE_1: 38,
+  DESTROY_STAGE_2: 39,
+  DESTROY_STAGE_3: 40,
+  DESTROY_STAGE_4: 41,
+  DESTROY_STAGE_5: 42,
+  DESTROY_STAGE_6: 43,
+  DESTROY_STAGE_7: 44,
+  DESTROY_STAGE_8: 45,
+  DESTROY_STAGE_9: 46,
 });
 
 /**
@@ -814,6 +825,76 @@ function drawStoneShovel(ctx, ox, oy, seed) {
 }
 
 /**
+ * 绘制破坏阶段贴图 (按原版 Minecraft 16x16 像素图风格)
+ * 共 10 个阶段 (0-9), stage 越大裂痕越密集, 9 为完全破碎
+ * 黑色半透明裂痕线, 透过去能看到底层方块贴图
+ * @param {CanvasRenderingContext2D} ctx 上下文
+ * @param {number} ox 原点 X
+ * @param {number} oy 原点 Y
+ * @param {number} stage 破坏阶段 0-9
+ */
+function drawDestroyStage(ctx, ox, oy, stage) {
+  ctx.clearRect(ox, oy, TILE_SIZE, TILE_SIZE);
+  // 透明背景, 黑色裂痕像素 (alpha 随 stage 增大)
+  const alpha = 0.2 + stage * 0.07; // 0.2 -> 0.83
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+
+  // 各阶段的裂痕像素坐标 (手工设计的递进式裂痕)
+  // stage 0: 几乎无裂痕 (1-2 像素)
+  // stage 9: 几乎完全破碎 (大量像素)
+  const stageCracks = [
+    // stage 0: 极少裂痕
+    [[7, 4], [8, 4]],
+    // stage 1: 顶部小裂痕
+    [[5, 2], [6, 2], [7, 3], [8, 3], [9, 4]],
+    // stage 2: 顶+底
+    [[3, 1], [4, 2], [5, 2], [7, 3], [8, 3], [10, 5], [11, 6], [6, 12], [7, 13]],
+    // stage 3
+    [[2, 1], [3, 1], [4, 2], [5, 2], [7, 3], [8, 4], [9, 4], [11, 5], [12, 6], [4, 11], [5, 12], [6, 12], [8, 14]],
+    // stage 4: 中等裂痕
+    [[1, 0], [2, 1], [3, 1], [4, 2], [5, 2], [6, 3], [7, 3], [8, 4], [9, 4], [10, 5], [11, 6], [12, 6], [13, 7],
+     [2, 9], [3, 10], [4, 11], [5, 12], [6, 12], [7, 13], [8, 14], [9, 14]],
+    // stage 5: 加左侧
+    [[0, 2], [1, 3], [2, 4], [1, 0], [2, 1], [3, 1], [4, 2], [5, 2], [6, 3], [7, 3], [8, 4], [9, 4], [10, 5], [11, 6], [12, 6], [13, 7],
+     [2, 9], [3, 10], [4, 11], [5, 12], [6, 12], [7, 13], [8, 14], [9, 14], [10, 11], [11, 12]],
+    // stage 6: 加右侧
+    [[0, 2], [1, 3], [2, 4], [14, 5], [13, 6], [12, 7],
+     [1, 0], [2, 1], [3, 1], [4, 2], [5, 2], [6, 3], [7, 3], [8, 4], [9, 4], [10, 5], [11, 6], [12, 6], [13, 7],
+     [2, 9], [3, 10], [4, 11], [5, 12], [6, 12], [7, 13], [8, 14], [9, 14], [10, 11], [11, 12], [4, 8], [9, 9]],
+    // stage 7: 更密
+    [[0, 2], [1, 3], [2, 4], [14, 5], [13, 6], [12, 7], [0, 8], [1, 9],
+     [1, 0], [2, 1], [3, 1], [4, 2], [5, 2], [6, 3], [7, 3], [8, 4], [9, 4], [10, 5], [11, 6], [12, 6], [13, 7],
+     [2, 9], [3, 10], [4, 11], [5, 12], [6, 12], [7, 13], [8, 14], [9, 14], [10, 11], [11, 12], [4, 8], [9, 9],
+     [14, 10], [13, 11], [12, 12], [11, 13], [10, 14]],
+    // stage 8: 大量
+    [[0, 2], [1, 3], [2, 4], [14, 5], [13, 6], [12, 7], [0, 8], [1, 9], [14, 0], [13, 1],
+     [1, 0], [2, 1], [3, 1], [4, 2], [5, 2], [6, 3], [7, 3], [8, 4], [9, 4], [10, 5], [11, 6], [12, 6], [13, 7],
+     [2, 9], [3, 10], [4, 11], [5, 12], [6, 12], [7, 13], [8, 14], [9, 14], [10, 11], [11, 12], [4, 8], [9, 9],
+     [14, 10], [13, 11], [12, 12], [11, 13], [10, 14], [5, 5], [6, 6], [7, 7], [8, 8], [3, 13], [4, 14]],
+    // stage 9: 几乎完全破碎
+    (() => {
+      const pts = [];
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          // 网格状密集 + 随机间隔, 模拟完全破碎
+          if ((x + y * 7) % 3 === 0 || (x * 3 + y) % 4 === 0) {
+            pts.push([x, y]);
+          }
+        }
+      }
+      return pts;
+    })(),
+  ];
+
+  const cracks = stageCracks[stage] || stageCracks[9];
+  for (const [x, y] of cracks) {
+    if (x >= 0 && x < TILE_SIZE && y >= 0 && y < TILE_SIZE) {
+      px(ctx, ox + x, oy + y, `rgba(0,0,0,${alpha})`);
+    }
+  }
+}
+
+/**
  * 纹理图集类
  * 负责生成图集画布、构造 THREE.CanvasTexture、提供 UV 查询与 UI 图标
  */
@@ -881,6 +962,16 @@ export class TextureAtlas {
       drawStoneAxe,            // 34
       drawStoneSword,          // 35
       drawStoneShovel,         // 36
+      (c, x, y, s) => drawDestroyStage(c, x, y, 0), // 37 destroy_stage_0
+      (c, x, y, s) => drawDestroyStage(c, x, y, 1), // 38 destroy_stage_1
+      (c, x, y, s) => drawDestroyStage(c, x, y, 2), // 39 destroy_stage_2
+      (c, x, y, s) => drawDestroyStage(c, x, y, 3), // 40 destroy_stage_3
+      (c, x, y, s) => drawDestroyStage(c, x, y, 4), // 41 destroy_stage_4
+      (c, x, y, s) => drawDestroyStage(c, x, y, 5), // 42 destroy_stage_5
+      (c, x, y, s) => drawDestroyStage(c, x, y, 6), // 43 destroy_stage_6
+      (c, x, y, s) => drawDestroyStage(c, x, y, 7), // 44 destroy_stage_7
+      (c, x, y, s) => drawDestroyStage(c, x, y, 8), // 45 destroy_stage_8
+      (c, x, y, s) => drawDestroyStage(c, x, y, 9), // 46 destroy_stage_9
     ];
 
     drawers.forEach((drawer, i) => {
@@ -976,5 +1067,54 @@ export class TextureAtlas {
     cloneCtx.imageSmoothingEnabled = false;
     cloneCtx.drawImage(src, 0, 0);
     return clone;
+  }
+
+  /**
+   * 获取指定贴图的代表颜色 (从 atlas canvas 中采样该贴图中心区域的平均色)
+   * 用于方块破坏粒子的着色 (粒子颜色与被破坏的方块一致)
+   *
+   * 实现细节:
+   *   - 直接从图集 canvas 上读取 16x16 像素的 ImageData
+   *   - 跳过完全透明像素 (避免边缘空像素拉低平均色)
+   *   - 缓存结果, 避免反复调用 getImageData
+   *
+   * @param {number} tileIndex 贴图索引
+   * @returns {THREE.Color} 代表颜色 (0-1 浮点)
+   */
+  getTileColor(tileIndex) {
+    // 缓存: 避免每帧破坏粒子时反复调用 getImageData
+    if (this._colorCache && this._colorCache.has(tileIndex)) {
+      return this._colorCache.get(tileIndex);
+    }
+    if (!this._colorCache) this._colorCache = new Map();
+
+    const col = tileIndex % TILES_PER_ROW;
+    const row = Math.floor(tileIndex / TILES_PER_ROW);
+    const ctx = this.canvas.getContext('2d');
+    const data = ctx.getImageData(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE).data;
+
+    // 累加非透明像素的 RGB
+    let r = 0, g = 0, b = 0, count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 32) continue; // 跳过透明像素
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      count++;
+    }
+    if (count === 0) {
+      // 全透明 (如玻璃边缘), 用灰色兜底
+      const col2 = new THREE.Color(0xaaaaaa);
+      this._colorCache.set(tileIndex, col2);
+      return col2;
+    }
+    const color = new THREE.Color(
+      (r / count) / 255,
+      (g / count) / 255,
+      (b / count) / 255
+    );
+    this._colorCache.set(tileIndex, color);
+    return color;
   }
 }

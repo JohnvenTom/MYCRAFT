@@ -38,6 +38,7 @@ import { MobPhysics, MobAI } from './game/entity/MobAI.js';
 import { MobSpawner } from './game/entity/MobSpawner.js';
 import { MultiplayerClient } from './game/net/MultiplayerClient.js';
 import { ParticleSystem } from './game/entity/Particle.js';
+import { BreakOverlay } from './game/blocks/BreakOverlay.js';
 
 /* ==========================================================================
    像素风格状态图标 (心形 / 鸡腿) 的像素图定义
@@ -412,13 +413,15 @@ class Game {
     this.hotbar = new Hotbar(
       this.atlas, this.engine.input, this.dom.hotbar, this.dom.blockName, this.inventory
     );
+    // 破坏裂缝覆盖层 (在 atlas 生成之后创建, 复用 atlas 纹理采样破坏阶段贴图)
+    this.breakOverlay = new BreakOverlay(this.engine.scene, this.atlas.texture);
     this.mobPhysics = new MobPhysics(this.world);
     this.mobAI = new MobAI();
     this.mobSpawner = new MobSpawner({
       world: this.world,
       scene: this.engine.scene,
     });
-    // 粒子系统 (死亡烟雾 / 受击血溅)
+    // 粒子系统 (死亡烟雾 / 受击血溅 / 方块破坏飞溅)
     this.particles = new ParticleSystem(this.engine.scene);
 
     // 多人联机 (可选)
@@ -453,6 +456,12 @@ class Game {
       net: this.net,
       // 工作台交互回调: 右键工作台时打开 3x3 合成 UI
       onUseWorkbench: () => this._openInventory(true),
+      // 破坏裂缝覆盖层: 显示挖掘进度 (像素裂缝贴图叠加在被破坏的方块上)
+      breakOverlay: this.breakOverlay,
+      // 粒子系统: 方块破坏时产生像素飞屑
+      particles: this.particles,
+      // 纹理图集: 用于查询方块代表色 (粒子着色)
+      atlas: this.atlas,
     });
 
     // 物品栏 + 合成 UI
@@ -790,6 +799,7 @@ class Game {
       this.world = null;
     }
     if (this.highlight) { this.highlight.dispose(); this.highlight = null; }
+    if (this.breakOverlay) { this.breakOverlay.dispose(); this.breakOverlay = null; }
     // 清场景中的非引擎对象 (天空/光照由 dayNight/sky 持有, 此处简化: 直接清场景子项)
     while (this.engine.scene.children.length > 0) {
       const obj = this.engine.scene.children[0];
