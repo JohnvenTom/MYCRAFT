@@ -1,0 +1,18 @@
+{
+  "name": "mycraft",
+  "version": "0.1.0",
+  "description": "MYCRAFT - 基于 Three.js 的网页版 Minecraft",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "simplex-noise": "^4.0.1",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

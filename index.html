@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="MYCRAFT - 基于 Three.js 的网页版 Minecraft 沙盒游戏" />
+  <title>MYCRAFT - Web Minecraft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/styles/main.css" />
+</head>
+<body>
+  <!-- 游戏 Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- 准星 -->
+  <div id="crosshair"></div>
+
+  <!-- 水下视觉覆盖层 (蓝色滤镜) -->
+  <div id="water-overlay"></div>
+
+  <!-- 受伤红屏覆盖层 -->
+  <div id="hurt-overlay"></div>
+
+  <!-- 调试信息 HUD -->
+  <div id="debug-hud"></div>
+
+  <!-- 热键栏 -->
+  <div id="hotbar"></div>
+
+  <!-- 生命值 / 饥饿值状态栏 (像素风心形 + 鸡腿) -->
+  <div id="status-bar">
+    <div class="status-row health-row" id="health-row"></div>
+    <div class="status-row hunger-row" id="hunger-row"></div>
+  </div>
+
+  <!-- 死亡画面 -->
+  <div id="death-screen" class="hidden">
+    <div class="death-content">
+      <h1 class="death-title">你死了!</h1>
+      <button id="respawn-btn" class="mc-btn primary">重生</button>
+    </div>
+  </div>
+
+  <!-- 当前方块提示 -->
+  <div id="block-name"></div>
+
+  <!-- 加载提示 -->
+  <div id="loading-screen" class="screen">
+    <div class="loading-content">
+      <h1 class="logo">MYCRAFT</h1>
+      <p id="loading-text">正在生成世界...</p>
+      <div class="loading-bar"><div id="loading-progress"></div></div>
+    </div>
+  </div>
+
+  <!-- 主菜单 -->
+  <div id="main-menu" class="screen hidden">
+    <div class="menu-content">
+      <h1 class="logo">MYCRAFT</h1>
+      <p class="subtitle">A Web Minecraft Clone · Three.js</p>
+      <div class="menu-panel">
+        <div class="field">
+          <label for="seed-input">世界种子 (留空随机)</label>
+          <input id="seed-input" type="text" placeholder="输入数字种子或留空" autocomplete="off" />
+        </div>
+        <button id="play-btn" class="mc-btn primary">点击进入世界</button>
+        <button id="load-btn" class="mc-btn">加载已存世界</button>
+        <button id="delete-btn" class="mc-btn danger">删除存档</button>
+      </div>
+      <div class="controls-panel">
+        <h3>操作说明</h3>
+        <ul>
+          <li><b>W A S D</b> — 移动</li>
+          <li><b>空格</b> — 跳跃 / 创造模式上升</li>
+          <li><b>Shift</b> — 蹲下 / 创造模式下降</li>
+          <li><b>Ctrl</b> — 加速冲刺</li>
+          <li><b>鼠标</b> — 视角</li>
+          <li><b>左键</b> — 破坏方块</li>
+          <li><b>右键</b> — 放置方块</li>
+          <li><b>1-9</b> / <b>滚轮</b> — 切换热键栏</li>
+          <li><b>F</b> — 切换创造/生存</li>
+          <li><b>F3</b> — 调试信息</li>
+          <li><b>ESC</b> — 暂停菜单</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 暂停菜单 -->
+  <div id="pause-menu" class="screen hidden">
+    <div class="menu-content">
+      <h2 class="pause-title">已暂停</h2>
+      <div class="menu-panel">
+        <label class="slider-label">渲染距离: <span id="rd-value">8</span> 区块</label>
+        <input id="render-distance" type="range" min="2" max="16" value="8" />
+        <label class="slider-label">鼠标灵敏度: <span id="sens-value">1.0</span></label>
+        <input id="sensitivity" type="range" min="0.1" max="3" step="0.1" value="1.0" />
+        <label class="slider-label">音量: <span id="vol-value">0.5</span></label>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.5" />
+        <button id="resume-btn" class="mc-btn primary">继续游戏</button>
+        <button id="save-btn" class="mc-btn">保存世界</button>
+        <button id="quit-btn" class="mc-btn danger">返回主菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 破坏进度覆盖层 -->
+  <div id="break-overlay" class="hidden"></div>
+
+  <!-- 物品栏 + 合成 UI (按 E 打开) -->
+  <div id="inventory-screen" class="screen hidden">
+    <div class="inventory-content">
+      <!-- 2x2 物品栏合成区 (无工作台时) / 3x3 工作台合成区 (打开工作台时) -->
+      <div id="crafting-area">
+        <div class="crafting-grid" id="crafting-grid"></div>
+        <div class="crafting-arrow">→</div>
+        <div class="crafting-output" id="crafting-output"></div>
+      </div>
+      <!-- 27 格背包 -->
+      <div class="inventory-grid" id="inventory-grid"></div>
+      <!-- 9 格热键栏 -->
+      <div class="inventory-hotbar" id="inventory-hotbar"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
