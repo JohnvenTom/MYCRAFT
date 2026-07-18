@@ -115,11 +115,15 @@ export class DayNightCycle {
     this.scene.background = bgColor;
     if (this.scene.fog) this.scene.fog.color.copy(bgColor);
 
-    // 光强: 白天强, 夜里弱
+    // 光强: 白天强, 夜里弱 (修复: 提高夜晚基础亮度, 避免暗部看不清)
+    // dayFactor: 0=夜, 1=正午
     const dayFactor = THREE.MathUtils.clamp(sunHeight * 1.5 + 0.2, 0, 1);
-    this.sunLight.intensity = dayFactor * 1.1;
-    this.hemiLight.intensity = 0.2 + dayFactor * 0.5;
-    this.ambient.intensity = 0.15 + dayFactor * 0.1;
+    // 太阳/月光: 白天 1.3, 夜晚保留 0.25 月光 (原版夜晚 0 太黑)
+    this.sunLight.intensity = dayFactor * 1.3 + 0.25;
+    // 半球光 (天空→地面): 夜晚 0.45 基础, 白天 1.0
+    this.hemiLight.intensity = 0.45 + dayFactor * 0.55;
+    // 环境光: 夜晚 0.4 基础 (原 0.15 太暗), 白天 0.6
+    this.ambient.intensity = 0.4 + dayFactor * 0.2;
 
     // 太阳光位置 (方向光, 模拟太阳方向; 跟随相机让阴影视锥始终覆盖玩家周围)
     const skyR = 100;
@@ -139,20 +143,19 @@ export class DayNightCycle {
     this.sunLight.color.copy(sunColor);
 
     // 高级光影: 动态调整后处理参数
-    // - 白天 Bloom 强度高 (太阳/月亮光晕), 阈值低 (更多区域发光)
-    // - 夜晚 Bloom 强度低, 阈值高 (仅强发光物体产生光晕)
-    // - 曝光夜晚略降 (变暗), 色温夜晚偏冷 (-0.5)
+    // 修复: 暗部太暗看不清 → 提高夜晚曝光补偿 + 降低对比度
     if (this.postFX) {
       // dayFactor: 0=夜, 1=正午 (已在上面计算)
       const bloomStrength = 0.4 + dayFactor * 0.5; // 夜 0.4, 白天 0.9
       const bloomThreshold = 0.9 - dayFactor * 0.3; // 夜 0.9 (仅强光), 白天 0.6 (更多发光)
       this.postFX.setBloomParams(bloomStrength, bloomThreshold);
-      // 曝光: 夜晚 0.85, 正午 1.05
-      const exposure = 0.85 + dayFactor * 0.2;
-      // 色温: 日出/日落偏暖 (+0.4), 正午中性 (0), 夜晚偏冷 (-0.5)
-      const temperature = warmth * 0.4 - (1 - dayFactor) * 0.5;
-      // 饱和度: 日出/日落增强 (1.3), 夜晚降低 (0.85, 偏灰)
-      const saturation = 0.85 + dayFactor * 0.3 + warmth * 0.15;
+      // 曝光: 夜晚 1.15 (提亮暗部), 正午 1.05 (避免过曝)
+      // 修复: 原版夜晚 0.85 太暗, 改为夜晚更高曝光补偿
+      const exposure = 1.15 - dayFactor * 0.1;
+      // 色温: 日出/日落偏暖 (+0.3), 正午中性 (0), 夜晚偏冷 (-0.3, 减弱冷感)
+      const temperature = warmth * 0.3 - (1 - dayFactor) * 0.3;
+      // 饱和度: 日出/日落增强 (1.25), 夜晚略降 (0.95, 不太灰)
+      const saturation = 0.95 + dayFactor * 0.2 + warmth * 0.1;
       this.postFX.setColorGrade(exposure, temperature, saturation);
     }
   }

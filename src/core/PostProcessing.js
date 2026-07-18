@@ -23,10 +23,11 @@ const ColorGradeShader = {
     tDiffuse: { value: null },
     /** 曝光 (默认 1.0) */
     uExposure: { value: 1.0 },
-    /** 对比度 (1.0=不变, >1 增加) */
-    uContrast: { value: 1.08 },
+    /** 对比度 (1.0=不变, >1 增加)
+     *  修复: 原 1.08 会进一步压缩暗部, 降到 1.02 让暗部更可见 */
+    uContrast: { value: 1.02 },
     /** 饱和度 (1.0=不变, 0=灰度) */
-    uSaturation: { value: 1.12 },
+    uSaturation: { value: 1.1 },
     /** 色温偏移 (-1=冷, +1=暖), 用于夜晚偏冷蓝 */
     uTemperature: { value: 0.0 },
   },
