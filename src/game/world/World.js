@@ -36,23 +36,91 @@ export class World {
     /** 每帧最多构建几个区块 (避免卡顿) */
     this.maxBuildsPerFrame = 2;
 
-    // 共享材质 (所有区块复用)
-    this.materialOpaque = new THREE.MeshLambertMaterial({
+    // 共享材质 (所有区块复用) - 高级光影: 用 MeshStandardMaterial (PBR)
+    // roughness=0.95 接近 Lambert 但保留高光能力, metalness=0
+    this.materialOpaque = new THREE.MeshStandardMaterial({
       vertexColors: true,
       map: atlas.texture,
+      roughness: 0.95,
+      metalness: 0.0,
+      // 接收阴影
+      receiveShadow: true,
     });
-    this.materialTransparent = new THREE.MeshLambertMaterial({
+    // 透明方块材质 (树叶/玻璃): 略微光滑
+    this.materialTransparent = new THREE.MeshStandardMaterial({
       vertexColors: true,
       map: atlas.texture,
       transparent: true,
       opacity: 1,
       depthWrite: true,
       side: THREE.DoubleSide,
+      roughness: 0.7,
+      metalness: 0.0,
+      receiveShadow: true,
     });
-    // 水单独用半透明材质? 此处先用统一透明材质, 后续可拆分
+    // 水单独材质: 半透明 + 高光反射 + 法线扰动
+    this.materialWater = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      map: atlas.texture,
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      roughness: 0.15,   // 极光滑 → 强高光
+      metalness: 0.3,    // 金属感增强反射
+      envMapIntensity: 1.0,
+    });
+    // 水面法线扰动: 用一个程序生成的法线贴图模拟波纹
+    this.materialWater.normalMap = this._generateWaterNormalMap();
+    this.materialWater.normalScale = new THREE.Vector2(0.4, 0.4);
 
     /** 用于增量保存: 修改过的区块 key 集合 */
     this.dirtyForSave = new Set();
+  }
+
+  /**
+   * 程序化生成水面法线贴图 (波纹效果)
+   * 用 Perlin 风格噪声生成法线, 模拟水面起伏
+   * @returns {THREE.Texture}
+   */
+  _generateWaterNormalMap() {
+    const size = 64;
+    const data = new Uint8Array(size * size * 4);
+    // 简单的伪随机噪声 + 多频率叠加
+    const noise = (x, y) => {
+      const a = Math.sin(x * 0.5 + y * 0.3) * 0.5;
+      const b = Math.sin(x * 0.9 + y * 1.1) * 0.3;
+      const c = Math.sin(x * 1.7 + y * 0.7) * 0.2;
+      return (a + b + c + 1) / 2; // 0..1
+    };
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        // 中心差分计算梯度
+        const hL = noise(x - 1, y);
+        const hR = noise(x + 1, y);
+        const hD = noise(x, y - 1);
+        const hU = noise(x, y + 1);
+        // 法线 = normalize((hL - hR), (hD - hU), strength)
+        const dx = (hL - hR) * 4;
+        const dy = (hD - hU) * 4;
+        const dz = 1;
+        const len = Math.hypot(dx, dy, dz);
+        const nx = dx / len;
+        const ny = dy / len;
+        const nz = dz / len;
+        const idx = (y * size + x) * 4;
+        data[idx] = (nx * 0.5 + 0.5) * 255;
+        data[idx + 1] = (ny * 0.5 + 0.5) * 255;
+        data[idx + 2] = (nz * 0.5 + 0.5) * 255;
+        data[idx + 3] = 255;
+      }
+    }
+    const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(8, 8);
+    tex.needsUpdate = true;
+    return tex;
   }
 
   /**
@@ -182,7 +250,7 @@ export class World {
    * @param {number} [opts.lodLevel=0] LOD 等级
    */
   _rebuildChunkMesh(chunk, opts = {}) {
-    // 清理旧 mesh
+    // 清理旧 mesh (含水面)
     if (chunk.meshOpaque) {
       this.scene.remove(chunk.meshOpaque);
       chunk.meshOpaque.geometry.dispose();
@@ -193,8 +261,13 @@ export class World {
       chunk.meshTransparent.geometry.dispose();
       chunk.meshTransparent = null;
     }
+    if (chunk.meshWater) {
+      this.scene.remove(chunk.meshWater);
+      chunk.meshWater.geometry.dispose();
+      chunk.meshWater = null;
+    }
 
-    const { opaque, transparent } = this.meshBuilder.build(
+    const { opaque, transparent, water } = this.meshBuilder.build(
       chunk,
       (wx, wy, wz) => this.getBlock(wx, wy, wz),
       opts
@@ -203,9 +276,10 @@ export class World {
     if (opaque) {
       const mesh = new THREE.Mesh(opaque, this.materialOpaque);
       mesh.position.set(0, 0, 0);
-      // 显式启用视锥剔除 (Three.js 默认即 true, 此处表达意图)
-      // 配合 geometry.computeBoundingSphere() 即可让超出相机视锥的区块提前剔除
       mesh.frustumCulled = true;
+      // 高级光影: 不透明方块投射阴影
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       this.scene.add(mesh);
       chunk.meshOpaque = mesh;
     }
@@ -213,8 +287,18 @@ export class World {
       const mesh = new THREE.Mesh(transparent, this.materialTransparent);
       mesh.position.set(0, 0, 0);
       mesh.frustumCulled = true;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       this.scene.add(mesh);
       chunk.meshTransparent = mesh;
+    }
+    if (water) {
+      const mesh = new THREE.Mesh(water, this.materialWater);
+      mesh.position.set(0, 0, 0);
+      mesh.frustumCulled = true;
+      mesh.receiveShadow = true; // 水面接收阴影 (波光下的阴影)
+      this.scene.add(mesh);
+      chunk.meshWater = mesh;
     }
     chunk.dirty = false;
     // 记录本次构建使用的 LOD 等级, 供 updateChunks 检测变化
@@ -371,5 +455,6 @@ export class World {
     this.buildQueue.length = 0;
     this.materialOpaque.dispose();
     this.materialTransparent.dispose();
+    if (this.materialWater) this.materialWater.dispose();
   }
 }

@@ -19,12 +19,15 @@ export class Engine {
     // 渲染器
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: false, // 像素风关闭抗锯齿
+      antialias: false, // 像素风关闭抗锯齿, 由后处理 FXAA 替代
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // 高级光影: 启用阴影贴图 (PCFSoft 软阴影)
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // 场景与雾
     this.scene = new THREE.Scene();
@@ -48,11 +51,22 @@ export class Engine {
     /** 渲染前回调 (在 render 之前, 可用于摄像机同步) */
     this.onPreRender = null;
 
+    /** 后处理系统 (可选, 设置后用 composer.render 替代 renderer.render) */
+    this.postFX = null;
+
     this._running = false;
     this._rafId = 0;
 
     // 窗口尺寸变化
     window.addEventListener('resize', () => this._onResize());
+  }
+
+  /**
+   * 安装后处理系统 (替代直接 renderer.render)
+   * @param {import('./PostProcessing.js').PostProcessing} postFX
+   */
+  setPostProcessing(postFX) {
+    this.postFX = postFX;
   }
 
   /**
@@ -84,7 +98,12 @@ export class Engine {
     if (this.onUpdate) this.onUpdate(dt);
     if (this.onPreRender) this.onPreRender();
 
-    this.renderer.render(this.scene, this.camera);
+    // 高级光影: 优先用后处理 composer 渲染, 否则直接 renderer.render
+    if (this.postFX) {
+      this.postFX.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
 
     // 帧末清理输入一次性状态
     this.input.endFrame();
@@ -100,6 +119,8 @@ export class Engine {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    // 后处理系统也需同步分辨率
+    if (this.postFX) this.postFX.resize();
   }
 
   /**

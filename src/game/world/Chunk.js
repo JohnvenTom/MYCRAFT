@@ -20,8 +20,10 @@ export class Chunk {
     this.blocks = new Uint8Array(BLOCK_COUNT);
     /** @type {THREE.Mesh|null} 不透明网格 */
     this.meshOpaque = null;
-    /** @type {THREE.Mesh|null} 透明网格 (水/叶/玻璃) */
+    /** @type {THREE.Mesh|null} 透明网格 (树叶/玻璃) */
     this.meshTransparent = null;
+    /** @type {THREE.Mesh|null} 水面网格 (单独材质, 高级光影) */
+    this.meshWater = null;
     /** 是否需要重建网格 */
     this.dirty = true;
     /** 是否已加载到世界 */
@@ -107,6 +109,11 @@ export class Chunk {
       scene.remove(this.meshTransparent);
       this.meshTransparent.geometry.dispose();
       this.meshTransparent = null;
+    }
+    if (this.meshWater) {
+      scene.remove(this.meshWater);
+      this.meshWater.geometry.dispose();
+      this.meshWater = null;
     }
   }
 }

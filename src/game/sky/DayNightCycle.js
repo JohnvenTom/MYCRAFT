@@ -34,11 +34,14 @@ export class DayNightCycle {
    * @param {THREE.Scene} opts.scene
    * @param {THREE.Camera} opts.camera
    * @param {Sky} [opts.sky] 天空对象
+   * @param {import('../../core/PostProcessing.js').PostProcessing} [opts.postFX] 后处理系统 (用于动态调整 Bloom/曝光)
    */
-  constructor({ scene, camera, sky }) {
+  constructor({ scene, camera, sky, postFX }) {
     this.scene = scene;
     this.camera = camera;
     this.sky = sky;
+    /** 后处理系统引用 (可选, 用于动态调整 Bloom 强度/色温) */
+    this.postFX = postFX;
 
     /** 一天内时间 [0,1) */
     this.time = 0.3; // 早晨开始
@@ -51,6 +54,22 @@ export class DayNightCycle {
 
     this.sunLight = new THREE.DirectionalLight(0xfff4d6, 1.0);
     this.sunLight.position.set(50, 100, 30);
+    // 高级光影: 启用动态阴影
+    this.sunLight.castShadow = true;
+    // 阴影贴图分辨率 (2048 高质量; 性能不足可降为 1024)
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+    // 阴影正交视锥 (覆盖玩家周围 80m × 80m 区域)
+    const SHADOW_RANGE = 80;
+    this.sunLight.shadow.camera.left = -SHADOW_RANGE;
+    this.sunLight.shadow.camera.right = SHADOW_RANGE;
+    this.sunLight.shadow.camera.top = SHADOW_RANGE;
+    this.sunLight.shadow.camera.bottom = -SHADOW_RANGE;
+    this.sunLight.shadow.camera.near = 0.5;
+    this.sunLight.shadow.camera.far = 300;
+    // PCFSoft 软阴影, 边缘平滑
+    this.sunLight.shadow.radius = 2;
+    this.sunLight.shadow.bias = -0.0005;
     scene.add(this.sunLight);
     scene.add(this.sunLight.target);
 
@@ -102,7 +121,7 @@ export class DayNightCycle {
     this.hemiLight.intensity = 0.2 + dayFactor * 0.5;
     this.ambient.intensity = 0.15 + dayFactor * 0.1;
 
-    // 太阳光位置 (方向光, 模拟太阳方向)
+    // 太阳光位置 (方向光, 模拟太阳方向; 跟随相机让阴影视锥始终覆盖玩家周围)
     const skyR = 100;
     this.sunLight.position.set(
       this.camera.position.x + Math.cos(sunAngle) * skyR,
@@ -111,11 +130,31 @@ export class DayNightCycle {
     );
     this.sunLight.target.position.copy(this.camera.position);
     this.sunLight.target.updateMatrixWorld();
+    // 太阳在地平线下时关闭阴影 (避免无效渲染 + 错误阴影)
+    this.sunLight.castShadow = sunHeight > 0.05;
 
     // 太阳光色温: 日出/日落偏暖, 正午偏白
     const warmth = THREE.MathUtils.clamp(1 - Math.abs(sunHeight), 0, 1);
     const sunColor = new THREE.Color(0xfff4d6).lerp(new THREE.Color(0xff9a4a), warmth * 0.6);
     this.sunLight.color.copy(sunColor);
+
+    // 高级光影: 动态调整后处理参数
+    // - 白天 Bloom 强度高 (太阳/月亮光晕), 阈值低 (更多区域发光)
+    // - 夜晚 Bloom 强度低, 阈值高 (仅强发光物体产生光晕)
+    // - 曝光夜晚略降 (变暗), 色温夜晚偏冷 (-0.5)
+    if (this.postFX) {
+      // dayFactor: 0=夜, 1=正午 (已在上面计算)
+      const bloomStrength = 0.4 + dayFactor * 0.5; // 夜 0.4, 白天 0.9
+      const bloomThreshold = 0.9 - dayFactor * 0.3; // 夜 0.9 (仅强光), 白天 0.6 (更多发光)
+      this.postFX.setBloomParams(bloomStrength, bloomThreshold);
+      // 曝光: 夜晚 0.85, 正午 1.05
+      const exposure = 0.85 + dayFactor * 0.2;
+      // 色温: 日出/日落偏暖 (+0.4), 正午中性 (0), 夜晚偏冷 (-0.5)
+      const temperature = warmth * 0.4 - (1 - dayFactor) * 0.5;
+      // 饱和度: 日出/日落增强 (1.3), 夜晚降低 (0.85, 偏灰)
+      const saturation = 0.85 + dayFactor * 0.3 + warmth * 0.15;
+      this.postFX.setColorGrade(exposure, temperature, saturation);
+    }
   }
 
   /**

@@ -106,12 +106,13 @@ export class ChunkMeshBuilder {
   }
 
   /**
-   * 构建区块网格 (不透明 + 透明), 返回 BufferGeometry 数组
+   * 构建区块网格 (不透明 + 透明 + 水面), 返回 BufferGeometry 数组
+   * 高级光影: 水面单独分离, 让 World 用 materialWater (有 normalMap + 高光)
    * @param {import('./Chunk.js').Chunk} chunk 区块
    * @param {(wx:number,wy:number,wz:number) => number} getBlockWorld 获取世界坐标方块 id (跨区块)
    * @param {Object} [opts]
    * @param {number} [opts.lodLevel=0] LOD 等级: 0=完整(含AO), 1=跳过透明网格, 2=跳过AO
-   * @returns {{opaque: THREE.BufferGeometry|null, transparent: THREE.BufferGeometry|null}}
+   * @returns {{opaque: THREE.BufferGeometry|null, transparent: THREE.BufferGeometry|null, water: THREE.BufferGeometry|null}}
    */
   build(chunk, getBlockWorld, opts = {}) {
     const lodLevel = opts.lodLevel || 0;
@@ -124,8 +125,10 @@ export class ChunkMeshBuilder {
 
     /** 不透明面数据 */
     const opaqueData = this._newMeshData();
-    /** 透明面数据 */
+    /** 透明面数据 (树叶/玻璃) */
     const transparentData = this._newMeshData();
+    /** 水面数据 (单独材质) */
+    const waterData = this._newMeshData();
 
     for (let ly = 0; ly < CHUNK_HEIGHT; ly++) {
       for (let lz = 0; lz < CHUNK_SIZE; lz++) {
@@ -138,7 +141,11 @@ export class ChunkMeshBuilder {
           const wz = baseZ + lz;
           // LOD1+ 跳过树叶 (性能大头); 水和玻璃仍渲染
           if (skipLeaves && id === 6 /* LEAVES */) continue;
-          const target = def.transparent ? transparentData : opaqueData;
+          // 路由: 水单独放 waterData; 其他透明 (树叶/玻璃) 放 transparentData; 不透明放 opaqueData
+          let target;
+          if (def.liquid) target = waterData;
+          else if (def.transparent) target = transparentData;
+          else target = opaqueData;
 
           for (let f = 0; f < FACES.length; f++) {
             const face = FACES[f];
@@ -166,6 +173,7 @@ export class ChunkMeshBuilder {
     return {
       opaque: this._finalize(opaqueData, false),
       transparent: transparentData ? this._finalize(transparentData, true) : null,
+      water: waterData.positions.length > 0 ? this._finalize(waterData, true) : null,
     };
   }
 

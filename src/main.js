@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { Engine } from './core/Engine.js';
+import { PostProcessing } from './core/PostProcessing.js';
 import { TextureAtlas } from './utils/TextureAtlas.js';
 import { World } from './game/world/World.js';
 import { Chunk } from './game/world/Chunk.js';
@@ -342,10 +343,18 @@ class Game {
 
     // 生成天空与昼夜
     this.sky = new Sky(this.engine.scene);
+    // 高级光影: 创建后处理系统 (Bloom + ToneMapping + FXAA + 颜色分级)
+    this.postFX = new PostProcessing({
+      renderer: this.engine.renderer,
+      scene: this.engine.scene,
+      camera: this.engine.camera,
+    });
+    this.engine.setPostProcessing(this.postFX);
     this.dayNight = new DayNightCycle({
       scene: this.engine.scene,
       camera: this.engine.camera,
       sky: this.sky,
+      postFX: this.postFX,
     });
 
     // 加载存档区块 (如有)
