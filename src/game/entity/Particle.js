@@ -50,29 +50,30 @@ export class ParticleSystem {
 
   /**
    * 在指定位置生成死亡烟雾粒子 (向上飘 + 扩散 + 淡出)
+   * 调整: 粒子尺寸变小 (2-3 像素), 颜色偏白
    * @param {THREE.Vector3} pos 死亡位置
    * @param {number} [count=24] 粒子数量
-   * @param {number} [color=0x888888] 烟雾颜色 (默认灰)
+   * @param {number} [color=0xeeeeee] 烟雾颜色 (默认近白)
    */
-  spawnDeathSmoke(pos, count = 24, color = 0x888888) {
+  spawnDeathSmoke(pos, count = 24, color = 0xeeeeee) {
     const col = new THREE.Color(color);
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= this.maxParticles) break;
       // 随机水平方向 + 略向上初速度
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1.5 + Math.random() * 2.0;
+      const speed = 1.0 + Math.random() * 1.5; // 速度减半, 避免扩散太开
       this.particles.push({
         pos: pos.clone(),
         vel: new THREE.Vector3(
           Math.cos(angle) * speed,
-          2.0 + Math.random() * 2.5, // 向上
+          1.5 + Math.random() * 2.0, // 向上速度降低
           Math.sin(angle) * speed
         ),
         life: 0,
         maxLife: 1.2 + Math.random() * 0.8, // 1.2-2.0 秒
-        size: 4 + Math.random() * 4, // 像素大小 4-8
+        size: 2 + Math.random() * 1.5, // 像素大小 2-3.5 (原 4-8)
         color: col.clone(),
-        gravity: -1.5, // 轻微下沉 (烟雾上升后消散)
+        gravity: -1.0, // 轻微下沉 (烟雾上升后消散)
       });
     }
   }

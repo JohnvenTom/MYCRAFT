@@ -11,6 +11,11 @@ import * as THREE from 'three';
 import { GRAVITY } from '../../config/constants.js';
 import { isSolid, BlockId } from '../world/BlockType.js';
 
+/** 水中浮力加速度 (m/s², 略大于重力让生物缓慢上浮) */
+const MOB_BUOYANCY = 36;
+/** 水中水平阻尼 (每秒衰减到这个比例, 0.8=每秒衰减到 80%) */
+const WATER_DAMP = 0.8;
+
 /** AI 状态枚举 */
 export const AIState = Object.freeze({
   IDLE: 'idle',
@@ -33,13 +38,27 @@ export class MobPhysics {
    * 物理步进 (固定步长)
    * 修复: _moveAxis 只改 AABB, 必须从 AABB 反推 entity.position, 否则 syncTransform()
    * 调用 _updateAABB() 会用旧 position 重置 AABB, 实体永远无法移动 (与 Player 物理同根因)
+   * 修复: 添加水中浮力 (生物脚或身体在水方块中时上浮), 避免生物沉水底
    * @param {import('./Entity.js').Entity} entity
    * @param {number} dt
    */
   step(entity, dt) {
-    // 重力
-    entity.velocity.y -= GRAVITY * dt;
-    if (entity.velocity.y < this.terminalVelocity) entity.velocity.y = this.terminalVelocity;
+    // 检测是否在水中 (脚位或身体中段在水方块)
+    const inWater = this._isInWater(entity);
+
+    if (inWater) {
+      // 水中: 浮力抵消大部分重力, 缓慢上浮
+      entity.velocity.y -= (GRAVITY - MOB_BUOYANCY) * dt;
+      // 限制下沉速度, 让生物主要漂浮
+      if (entity.velocity.y < -2) entity.velocity.y = -2;
+      // 水平阻尼 (水中阻力)
+      entity.velocity.x *= WATER_DAMP;
+      entity.velocity.z *= WATER_DAMP;
+    } else {
+      // 空气中: 正常重力
+      entity.velocity.y -= GRAVITY * dt;
+      if (entity.velocity.y < this.terminalVelocity) entity.velocity.y = this.terminalVelocity;
+    }
 
     // 分轴碰撞 (只修改 AABB)
     entity.onGround = false;
@@ -53,6 +72,29 @@ export class MobPhysics {
     entity.position.z = (entity.aabb.min.z + entity.aabb.max.z) / 2;
 
     entity.syncTransform();
+  }
+
+  /**
+   * 检测实体是否在水中 (脚位或身体中段在水方块中)
+   * @param {import('./Entity.js').Entity} entity
+   * @returns {boolean}
+   */
+  _isInWater(entity) {
+    // 检查实体 AABB 覆盖的所有方块是否有水
+    const minX = Math.floor(entity.aabb.min.x);
+    const maxX = Math.floor(entity.aabb.max.x - 1e-6);
+    const minY = Math.floor(entity.aabb.min.y);
+    const maxY = Math.floor(entity.aabb.max.y - 1e-6);
+    const minZ = Math.floor(entity.aabb.min.z);
+    const maxZ = Math.floor(entity.aabb.max.z - 1e-6);
+    for (let y = minY; y <= maxY; y++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (this.world.getBlock(x, y, z) === BlockId.WATER) return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -215,17 +257,17 @@ export class MobAI {
 
   /**
    * 友好生物 AI
+   * 修复: 原版玩家靠近 8m 就逃跑 → 改为只在被玩家攻击后逃跑 (fleeTimer > 0)
    * @param {import('./Entity.js').Entity} entity
    * @param {number} dt
    * @param {Object} ctx
    * @param {number} distToPlayer
    */
   _updatePassive(entity, dt, ctx, distToPlayer) {
-    // 玩家靠近 (< 8m) 且玩家在生存模式 → 逃跑
-    if (distToPlayer < 8 && ctx.player.gameMode !== 'creative') {
+    // 仅在被攻击后 (fleeTimer > 0) 才逃跑
+    if (entity.fleeTimer > 0) {
       if (entity.aiState !== 'flee') {
         entity.aiState = 'flee';
-        entity.aiTimer = 2 + Math.random() * 2;
       }
       // 朝远离玩家方向
       const dx = entity.position.x - ctx.player.position.x;
@@ -233,8 +275,13 @@ export class MobAI {
       entity.targetYaw = Math.atan2(dx, dz);
       ctx.physics.moveForward(entity, 4.5);
       // 跳跃 (若被卡住)
-      if (entity.onGround && Math.random() < 0.1) entity.velocity.y = 7;
+      if (entity.onGround && Math.random() < 0.1) entity.velocity.y = 9;
     } else {
+      // 不在逃跑状态 → 切回游荡
+      if (entity.aiState === 'flee') {
+        entity.aiState = 'idle';
+        entity.aiTimer = 0;
+      }
       // 游荡
       if (entity.aiTimer <= 0) {
         const r = Math.random();
@@ -252,7 +299,7 @@ export class MobAI {
       if (entity.aiState === 'wander') {
         ctx.physics.moveForward(entity, 1.5);
         // 偶尔跳跃
-        if (entity.onGround && Math.random() < 0.02) entity.velocity.y = 6;
+        if (entity.onGround && Math.random() < 0.02) entity.velocity.y = 9;
       }
     }
   }
@@ -288,7 +335,7 @@ export class MobAI {
       ctx.physics.faceTo(entity, ctx.player.position);
       ctx.physics.moveForward(entity, 3.5);
       // 跳跃 (若被卡住)
-      if (entity.onGround && Math.random() < 0.05) entity.velocity.y = 7;
+      if (entity.onGround && Math.random() < 0.05) entity.velocity.y = 9;
     } else {
       // 游荡
       if (entity.aiTimer <= 0) {

@@ -80,6 +80,8 @@ export class Entity {
     this.invulnTime = 0;
     /** 受击闪烁剩余时间 (秒, 期间模型变红) */
     this.hurtFlash = 0;
+    /** 受击后逃跑剩余时间 (秒, 友好生物被玩家攻击后逃跑一段时间; 0=不逃跑) */
+    this.fleeTimer = 0;
   }
 
   /**
@@ -122,6 +124,8 @@ export class Entity {
     if (this.invulnTime > 0) return false;
     this.health -= amount;
     this.invulnTime = 0.5;
+    // 受击后逃跑计时 (友好生物被玩家打后逃跑 6 秒)
+    this.fleeTimer = 6.0;
     if (this.health <= 0) {
       this.health = 0;
       this.dead = true;
@@ -140,6 +144,11 @@ export class Entity {
     if (this.hurtFlash > 0) {
       this.hurtFlash -= dt;
       if (this.hurtFlash < 0) this.hurtFlash = 0;
+    }
+    // 受击逃跑倒计时
+    if (this.fleeTimer > 0) {
+      this.fleeTimer -= dt;
+      if (this.fleeTimer < 0) this.fleeTimer = 0;
     }
     this._updateHurtFlash();
     if (this.dead) return;

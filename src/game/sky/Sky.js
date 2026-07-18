@@ -84,65 +84,81 @@ export class Sky {
     this.stars = new THREE.Points(starGeo, starMat);
     scene.add(this.stars);
 
-    // 云层: 多个白色扁平方块组成的群, 飘浮在高空, 跟随相机 XZ 移动并缓慢漂移
+    // 云层: 放到世界里 (不跟随天空盒), 由 world-cloud-group 承载, 在 update 中跟随相机 XZ 平移
     this._initClouds();
   }
 
   /**
-   * 初始化云层 (一片大平面, 用多个白色矩形拼接的云朵)
-   * 云朵用 MeshBasicMaterial, 不受光照影响, fog=false 避免被远雾吃掉
+   * 初始化云层 (世界中云朵, 不跟随天空盒, 跟随相机 XZ 平移)
+   * 云朵由若干随机大小的扁平体素拼接, 形状更随机 (受 Perlin 启发的噪声偏移)
+   * 材质受 fog 影响 (与现实雾融合), 颜色在 update 中按时间变化
    */
   _initClouds() {
+    /** 云群组 (位于世界里, 不进 skyMesh 的子集) */
     this.cloudGroup = new THREE.Group();
-    /** @type {{mesh: THREE.Mesh, drift: number}[]} 云朵句柄 */
+    this.scene.add(this.cloudGroup);
+    /** @type {{mesh: THREE.Mesh, drift: number, offsetX: number}[]} 云朵句柄 */
     this.clouds = [];
-    /** 云层高度 (远高于玩家但低于天空盒半径 500) */
+    /** 云层高度 (世界里 Y=120, 远高于玩家) */
     this.cloudY = 120;
-    /** 云朵材质 (白色半透明, 双面, 不受光照/雾影响) */
-    const cloudMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.85,
-      fog: false,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
+    /** 云朵范围 (相对相机 XZ 平移的范围, 米) */
+    this.cloudRange = 500;
+    /** 每朵云独立材质 (用于时间变色) */
+    this.cloudMaterials = [];
 
-    // 生成 60 朵随机分布的云
-    for (let i = 0; i < 60; i++) {
-      const cloud = this._makeCloud(cloudMat);
-      // 在以原点为中心的 400×400 范围内随机分布
+    // 生成 40 朵随机分布的云 (减少数量, 单朵形状更随机)
+    for (let i = 0; i < 40; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.85,
+        fog: true, // 受雾影响, 与世界融合
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      this.cloudMaterials.push(mat);
+      const cloud = this._makeCloud(mat);
+      // 固定世界坐标 (在 -cloudRange..cloudRange 范围)
+      const baseX = (Math.random() - 0.5) * this.cloudRange * 2;
+      const baseZ = (Math.random() - 0.5) * this.cloudRange * 2;
       cloud.position.set(
-        (Math.random() - 0.5) * 800,
-        this.cloudY + (Math.random() - 0.5) * 8,
-        (Math.random() - 0.5) * 800
+        baseX,
+        this.cloudY + (Math.random() - 0.5) * 10,
+        baseZ
       );
       // 每朵云独立的漂移速度 (向 +X 方向缓慢移动)
-      const drift = 0.5 + Math.random() * 1.2;
-      this.clouds.push({ mesh: cloud, drift });
+      const drift = 0.6 + Math.random() * 1.4;
+      this.clouds.push({ mesh: cloud, drift, offsetX: baseX });
       this.cloudGroup.add(cloud);
     }
-    this.scene.add(this.cloudGroup);
   }
 
   /**
-   * 生成一朵云 (由若干白色扁平矩形组成的群)
+   * 生成一朵云 (由若干随机体素拼接, 形状不规则)
+   * 修复: 原版用规则 BoxGeometry 排列, 形状死板; 改为多层不规则偏移 + 高度变化
    * @param {THREE.Material} mat 共享材质
    * @returns {THREE.Group}
    */
   _makeCloud(mat) {
     const cloud = new THREE.Group();
-    const blocks = 4 + Math.floor(Math.random() * 5); // 4-8 个块
+    const blocks = 6 + Math.floor(Math.random() * 8); // 6-13 个块
+    // 云朵主体尺寸范围
+    const baseW = 8 + Math.random() * 14;
+    const baseD = 8 + Math.random() * 14;
     for (let i = 0; i < blocks; i++) {
-      // 扁平方块: 8×1×8 (像素风扁平云)
-      const w = 6 + Math.random() * 6;
-      const d = 6 + Math.random() * 6;
-      const geo = new THREE.BoxGeometry(w, 1, d);
+      // 每个块尺寸不同 (有的长条, 有的方块)
+      const w = baseW * (0.4 + Math.random() * 0.6);
+      const d = baseD * (0.4 + Math.random() * 0.6);
+      const h = 1 + Math.random() * 2.5; // 厚度 1-3.5
+      const geo = new THREE.BoxGeometry(w, h, d);
       const mesh = new THREE.Mesh(geo, mat);
+      // 块在云朵内分布: 用极坐标, 角度+半径随机
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * (baseW * 0.5);
       mesh.position.set(
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 1.5,
-        (Math.random() - 0.5) * 10
+        Math.cos(angle) * radius + (Math.random() - 0.5) * 3,
+        (Math.random() - 0.5) * 2, // Y 微小变化
+        Math.sin(angle) * radius + (Math.random() - 0.5) * 3
       );
       cloud.add(mesh);
     }
@@ -161,7 +177,7 @@ export class Sky {
 
   /**
    * 更新太阳/月亮/星空位置: 跟随相机, 围绕相机绕一圈
-   * 同时更新云朵: 跟随相机 XZ (避免视差穿出) + 缓慢向 +X 漂移
+   * 同时更新云朵: 漂移 + 超出范围环绕 + 按时间染色
    * @param {THREE.Camera} camera
    * @param {number} sunAngle 太阳角度 (弧度, 0=正午顶上, PI=午夜)
    * @param {number} [dt] 帧间隔 (秒, 用于云朵漂移)
@@ -182,15 +198,48 @@ export class Sky {
     this.stars.position.copy(camPos);
     // 天空盒跟随相机 (避免穿出)
     this.skyMesh.position.copy(camPos);
-    // 云朵: 整体跟随相机 XZ (Y 保持固定高度), 然后每朵独立漂移
-    this.cloudGroup.position.x = camPos.x;
-    this.cloudGroup.position.z = camPos.z;
-    // 云朵漂移: 每朵独立向 +X 方向移动, 超出相机范围则从对面回来 (环绕)
-    const wrapRange = 400;
-    for (const { mesh, drift } of this.clouds) {
-      mesh.position.x += drift * dt;
-      // 相对相机的 X 偏移超过 wrapRange 则环绕
-      if (mesh.position.x > wrapRange) mesh.position.x = -wrapRange;
+
+    // 云朵: 漂移 + 环绕 (世界坐标, 不跟随相机, 但超出范围则从对面回来)
+    const range = this.cloudRange;
+    for (const c of this.clouds) {
+      c.mesh.position.x += c.drift * dt;
+      // 相对相机的 X 距离超过 range 则从对面回来 (始终覆盖相机周围)
+      const relX = c.mesh.position.x - camPos.x;
+      if (relX > range) c.mesh.position.x -= range * 2;
+      else if (relX < -range) c.mesh.position.x += range * 2;
+      // Z 方向也环绕
+      const relZ = c.mesh.position.z - camPos.z;
+      if (relZ > range) c.mesh.position.z -= range * 2;
+      else if (relZ < -range) c.mesh.position.z += range * 2;
+    }
+
+    // 云朵颜色随时间变化: 日出/日落橙红, 正午白, 夜晚灰暗
+    this._updateCloudColor(sunAngle);
+  }
+
+  /**
+   * 根据太阳角度更新云朵颜色
+   * - sunAngle=0 (正午): 白色 0xffffff
+   * - sunAngle=PI/2 (日出/日落, 地平线): 橙红 0xff9966
+   * - sunAngle=PI (午夜): 深灰蓝 0x4a5060
+   * 用 sin(sunAngle) 在 [0, 1] 范围判断天黑程度, 用 |cos(sunAngle)| 判断日出日落
+   */
+  _updateCloudColor(sunAngle) {
+    // 天亮程度: 0=夜, 1=正午
+    const daylight = Math.max(0, Math.sin(sunAngle));
+    // 日出日落程度: 1=地平线, 0=正午/午夜
+    const horizon = Math.abs(Math.cos(sunAngle));
+    // 三色插值
+    const night = new THREE.Color(0x4a5060);   // 夜晚灰蓝
+    const noon = new THREE.Color(0xffffff);    // 正午白
+    const sunset = new THREE.Color(0xff9966);  // 日落橙
+    // 基础色: 夜→正午
+    const base = night.clone().lerp(noon, daylight);
+    // 日出日落时混入橙红
+    const sunsetMix = horizon * (1 - Math.abs(daylight - 0.5) * 2); // 仅在地平线附近生效
+    const final = base.lerp(sunset, Math.max(0, sunsetMix) * 0.6);
+    for (const mat of this.cloudMaterials) {
+      mat.color.copy(final);
     }
   }
 

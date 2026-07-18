@@ -72,7 +72,7 @@ export class MobSpawner {
             mob.position.y + mob.height / 2,
             mob.position.z
           );
-          ctx.particles.spawnDeathSmoke(center, 24, 0x888888);
+          ctx.particles.spawnDeathSmoke(center, 24, 0xffffff);
         }
         mob.dispose(this.scene);
         this.mobs.splice(i, 1);

@@ -618,7 +618,7 @@ class Game {
         this.player.position.y + this.player.height / 2,
         this.player.position.z
       );
-      this.particles.spawnDeathSmoke(center, 32, 0xaaaaaa);
+      this.particles.spawnDeathSmoke(center, 32, 0xffffff);
     }
     if (this.engine.input.pointerLocked) this.engine.input.exitPointerLock();
     if (this.dom.deathScreen) this.dom.deathScreen.classList.remove('hidden');
